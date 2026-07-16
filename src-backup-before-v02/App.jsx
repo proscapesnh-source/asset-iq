@@ -10,46 +10,26 @@ import { makeId } from './utils'
 import { demoAssets, initialProjects, initialTimeline } from './data/demoData'
 
 const load = (key, fallback) => {
-  try {
-    const value = localStorage.getItem(key)
-    return value ? JSON.parse(value) : fallback
-  } catch (error) {
-    console.warn(`Could not load ${key}`, error)
-    return fallback
-  }
-}
-
-const save = (key, value) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(value))
-    return true
-  } catch (error) {
-    console.warn(`Could not save ${key}`, error)
-    return false
-  }
+  try { return JSON.parse(localStorage.getItem(key)) ?? fallback } catch { return fallback }
 }
 
 export default function App() {
   const initialAssetId = new URLSearchParams(window.location.search).get('asset')
   const initialAssets = load('asset-iq-assets', demoAssets)
-  const safeInitialAssets = Array.isArray(initialAssets) && initialAssets.length ? initialAssets : demoAssets
-  const hasDeepLink = Boolean(initialAssetId && safeInitialAssets.some((asset) => asset.id === initialAssetId))
+  const hasDeepLink = initialAssetId && initialAssets.some((asset) => asset.id === initialAssetId)
 
   const [view, setView] = useState(hasDeepLink ? 'asset' : 'dashboard')
-  const [assets, setAssets] = useState(safeInitialAssets)
+  const [assets, setAssets] = useState(initialAssets)
   const [projects, setProjects] = useState(() => load('asset-iq-projects', initialProjects))
   const [timeline, setTimeline] = useState(() => load('asset-iq-timeline', initialTimeline))
-  const [selectedAssetId, setSelectedAssetId] = useState(hasDeepLink ? initialAssetId : safeInitialAssets[0]?.id)
+  const [selectedAssetId, setSelectedAssetId] = useState(hasDeepLink ? initialAssetId : initialAssets[0].id)
   const [toast, setToast] = useState('')
 
-  const selectedAsset = useMemo(
-    () => assets.find((asset) => asset.id === selectedAssetId) ?? assets[0] ?? null,
-    [assets, selectedAssetId],
-  )
+  const selectedAsset = useMemo(() => assets.find((asset) => asset.id === selectedAssetId) ?? assets[0], [assets, selectedAssetId])
 
-  useEffect(() => { save('asset-iq-assets', assets) }, [assets])
-  useEffect(() => { save('asset-iq-projects', projects) }, [projects])
-  useEffect(() => { save('asset-iq-timeline', timeline) }, [timeline])
+  useEffect(() => localStorage.setItem('asset-iq-assets', JSON.stringify(assets)), [assets])
+  useEffect(() => localStorage.setItem('asset-iq-projects', JSON.stringify(projects)), [projects])
+  useEffect(() => localStorage.setItem('asset-iq-timeline', JSON.stringify(timeline)), [timeline])
 
   const showToast = (message) => {
     setToast(message)
@@ -57,19 +37,13 @@ export default function App() {
   }
 
   const openAsset = (asset) => {
-    if (!asset?.id) return
     setSelectedAssetId(asset.id)
     setView('asset')
     const url = new URL(window.location.href)
     url.searchParams.set('asset', asset.id)
     window.history.replaceState({}, '', url)
   }
-
-  const startInspection = (asset = selectedAsset) => {
-    if (!asset?.id) return
-    setSelectedAssetId(asset.id)
-    setView('inspect')
-  }
+  const startInspection = (asset = selectedAsset) => { setSelectedAssetId(asset.id); setView('inspect') }
 
   const updateAssetPhoto = (assetId, coverPhoto) => {
     setAssets((items) => items.map((asset) => asset.id === assetId ? { ...asset, coverPhoto } : asset))
@@ -77,26 +51,18 @@ export default function App() {
   }
 
   const createAsset = (asset) => {
-    if (!asset?.id) {
-      showToast('Asset could not be created.')
-      return
-    }
-
-    const event = {
+    setAssets((items) => [asset, ...items])
+    setTimeline((items) => [{
       id: makeId('EV'),
       assetId: asset.id,
       date: new Date().toISOString().slice(0, 10),
       type: 'Asset Registration',
       title: 'Digital asset passport created',
-      detail: `${asset.inspectionLevel || 'Baseline record'} created from onboarding evidence. Data confidence: ${asset.dataConfidence ?? 'Not scored'}%.`,
+      detail: `${asset.inspectionLevel} created from onboarding evidence. Data confidence: ${asset.dataConfidence}%.`,
       source: 'Confirmed by user',
-    }
-
-    setAssets((items) => [asset, ...items.filter((item) => item.id !== asset.id)])
-    setTimeline((items) => [event, ...items])
+    }, ...items])
     setSelectedAssetId(asset.id)
     setView('asset')
-
     const url = new URL(window.location.href)
     url.searchParams.set('asset', asset.id)
     window.history.replaceState({}, '', url)
@@ -118,11 +84,7 @@ export default function App() {
   }
 
   const advanceProject = (projectId) => {
-    setProjects((items) => items.map((project) => project.id === projectId ? {
-      ...project,
-      stageIndex: Math.min(project.stageIndex + 1, project.stages.length - 1),
-      status: project.stageIndex + 1 >= project.stages.length - 1 ? 'Closed' : project.status,
-    } : project))
+    setProjects((items) => items.map((project) => project.id === projectId ? { ...project, stageIndex: Math.min(project.stageIndex + 1, project.stages.length - 1), status: project.stageIndex + 1 >= project.stages.length - 1 ? 'Closed' : project.status } : project))
     showToast('Project stage updated.')
   }
 
@@ -134,8 +96,8 @@ export default function App() {
 
   let content
   if (view === 'add-asset') content = <AddAssetWizard onCancel={() => setView('dashboard')} onCreate={createAsset} />
-  else if (view === 'asset' && selectedAsset) content = <AssetPassport asset={selectedAsset} timeline={timeline} onBack={() => { setView('dashboard'); window.history.replaceState({}, '', window.location.pathname) }} onStartInspection={startInspection} onUpdateAssetPhoto={updateAssetPhoto} />
-  else if (view === 'inspect' && selectedAsset) content = <QuickInspection asset={selectedAsset} onBack={() => setView('dashboard')} onComplete={completeInspection} />
+  else if (view === 'asset') content = <AssetPassport asset={selectedAsset} timeline={timeline} onBack={() => { setView('dashboard'); window.history.replaceState({}, '', window.location.pathname) }} onStartInspection={startInspection} onUpdateAssetPhoto={updateAssetPhoto} />
+  else if (view === 'inspect') content = <QuickInspection asset={selectedAsset} onBack={() => setView('dashboard')} onComplete={completeInspection} />
   else if (view === 'projects') content = <Projects projects={projects} assets={assets} onBack={() => setView('dashboard')} onAdvance={advanceProject} />
   else content = <Dashboard assets={assets} projects={projects} timeline={timeline} onOpenAsset={openAsset} onStartInspection={() => startInspection(assets[0])} onOpenProjects={() => setView('projects')} onAddAsset={() => setView('add-asset')} />
 

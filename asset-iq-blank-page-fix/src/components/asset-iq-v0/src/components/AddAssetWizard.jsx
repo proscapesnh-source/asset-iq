@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { compressImage } from '../utils'
 
 const templates = {
   'Storage Tank': ['Isolation Valve', 'Drain Valve', 'Level Gauge', 'Vent'],
@@ -32,31 +33,13 @@ export default function AddAssetWizard({ onCancel, onCreate }) {
   const suggestedComponents = useMemo(() => templates[draft.type] ?? [], [draft.type])
   const update = (field, value) => setDraft((current) => ({ ...current, [field]: value }))
 
-  const readPhoto = (file, setter) => {
+  const readPhoto = async (file, setter) => {
     if (!file) return
-
-    const reader = new FileReader()
-    reader.onerror = () => setter('')
-    reader.onload = () => {
-      const image = new Image()
-      image.onerror = () => setter(String(reader.result || ''))
-      image.onload = () => {
-        const maxDimension = 1280
-        const scale = Math.min(1, maxDimension / Math.max(image.width, image.height))
-        const canvas = document.createElement('canvas')
-        canvas.width = Math.max(1, Math.round(image.width * scale))
-        canvas.height = Math.max(1, Math.round(image.height * scale))
-        const context = canvas.getContext('2d')
-        if (!context) {
-          setter(String(reader.result || ''))
-          return
-        }
-        context.drawImage(image, 0, 0, canvas.width, canvas.height)
-        setter(canvas.toDataURL('image/jpeg', 0.72))
-      }
-      image.src = String(reader.result || '')
+    try {
+      setter(await compressImage(file))
+    } catch {
+      setter('')
     }
-    reader.readAsDataURL(file)
   }
 
   const selectType = (type) => {
