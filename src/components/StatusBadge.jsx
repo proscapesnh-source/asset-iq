@@ -1,4 +1,4 @@
-export default function StatusBadge({ status }) {
-  const slug = status.toLowerCase().replaceAll(' ', '-')
-  return <span className={`status-badge ${slug}`}>{status}</span>
+export default function StatusBadge({ status = 'Unknown' }) {
+  const key = status.toLowerCase().replace(/\s+/g, '-')
+  return <span className={`status-badge ${key}`}>{status}</span>
 }

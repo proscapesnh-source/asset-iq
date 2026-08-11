@@ -1,8 +1,4 @@
-export default function HealthRing({ value, label = 'Service health' }) {
-  return (
-    <div className="health-ring" style={{ '--health': value }} aria-label={`${label}: ${value}`}>
-      <strong>{value}</strong>
-      <span>{label}</span>
-    </div>
-  )
+export default function HealthRing({ value = 0, size = 'normal' }) {
+  const safe = Math.max(0, Math.min(100, Math.round(value || 0)))
+  return <div className={`health-ring ${size}`} style={{ '--score': `${safe * 3.6}deg` }}><div><strong>{safe}</strong><small>Health</small></div></div>
 }

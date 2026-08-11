@@ -1,0 +1,16 @@
+import { useState } from 'react'
+import StatusBadge from './StatusBadge'
+import { formatDate } from '../lib/data'
+
+export default function WorkOrders({ workOrders, assets, onCreate, onUpdate }) {
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ asset_id: assets[0]?.id || '', title: '', description: '', priority: 'Medium', due_date: '' })
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const submit = async (event) => { event.preventDefault(); setBusy(true); setError(''); try { await onCreate(form); setShowForm(false); setForm({ asset_id: assets[0]?.id || '', title: '', description: '', priority: 'Medium', due_date: '' }) } catch (e) { setError(e.message || 'Could not create work order.') } finally { setBusy(false) } }
+
+  return <div className="page-stack"><div className="page-heading"><div><p className="eyebrow">Maintenance execution</p><h1>Work Orders</h1><p>Track corrective action from inspection finding through completed repair.</p></div><button className="primary-button" onClick={() => setShowForm(!showForm)}>＋ New work order</button></div>
+    {showForm && <form className="panel form-grid" onSubmit={submit}><label>Asset<select required value={form.asset_id} onChange={(e) => setForm({ ...form, asset_id: e.target.value })}><option value="">Select asset</option>{assets.map((asset) => <option key={asset.id} value={asset.id}>{asset.asset_tag} · {asset.name}</option>)}</select></label><label>Priority<select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select></label><label className="full-width">Title<input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}/></label><label>Due date<input type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })}/></label><label className="full-width">Description<textarea rows="3" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}/></label>{error && <div className="error-message full-width">{error}</div>}<div className="form-actions full-width"><button type="button" className="secondary-button" onClick={() => setShowForm(false)}>Cancel</button><button className="primary-button" disabled={busy}>{busy ? 'Creating…' : 'Create work order'}</button></div></form>}
+    <section className="panel">{!workOrders.length ? <div className="empty-state"><strong>No work orders</strong><p>Repair and engineering-review inspections can create them automatically.</p></div> : <div className="work-order-table">{workOrders.map((item) => <article key={item.id}><div className="work-main"><div><strong>{item.title}</strong><p>{item.assets?.asset_tag} · {item.assets?.name}</p><small>{item.priority} priority · Due {formatDate(item.due_date)}</small></div><StatusBadge status={item.status}/></div>{item.description && <p>{item.description}</p>}<div className="work-actions">{['Open','Assigned','In Progress','Complete'].map((status) => <button key={status} className={item.status === status ? 'choice active' : 'choice'} disabled={item.status === status} onClick={() => onUpdate(item.id, { status })}>{status}</button>)}</div></article>)}</div>}</section>
+  </div>
+}

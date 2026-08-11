@@ -1,78 +1,26 @@
 import HealthRing from './HealthRing'
 import StatusBadge from './StatusBadge'
+import { formatDate } from '../lib/data'
 
-export default function Dashboard({ assets, projects, timeline, onOpenAsset, onStartInspection, onOpenProjects, onAddAsset }) {
-  const average = Math.round(assets.reduce((sum, asset) => sum + asset.serviceHealth, 0) / assets.length)
-  const needsAttention = assets.filter((asset) => asset.status !== 'Good').length
+export default function Dashboard({ data, onAddAsset, onOpenAsset, onInspect, onWorkOrders }) {
+  const allAssets = data.assets || []
+  const assets = allAssets.filter((item) => !item.dna?.lifecycle_status || ['Active','Out of Service'].includes(item.dna.lifecycle_status))
+  const workOrders = data.workOrders || []
+  const average = assets.length ? Math.round(assets.reduce((sum, item) => sum + (item.health_score || 0), 0) / assets.length) : 0
+  const attention = assets.filter((item) => (item.health_score || 0) < 80).length
+  const openWork = workOrders.filter((item) => item.status !== 'Complete').length
 
-  return (
-    <div className="page-stack">
-      <section className="hero-card">
-        <div>
-          <p className="eyebrow">Lifecycle intelligence</p>
-          <h2>Know what is in service today.</h2>
-          <p>Track vessels holding air, fuel, water, chemicals, and other process contents.</p>
-        </div>
-        <HealthRing value={average} />
-      </section>
+  return <div className="page-stack">
+    <div className="page-heading"><div><p className="eyebrow">Lifecycle intelligence</p><h1>Asset overview</h1><p>Live condition, inspection, and maintenance data from your Supabase project.</p></div><button className="primary-button" onClick={onAddAsset}>＋ Add asset</button></div>
 
-      <section className="metric-grid">
-        <article><strong>{assets.length}</strong><span>Assets</span></article>
-        <article><strong>{needsAttention}</strong><span>Need attention</span></article>
-        <article><strong>{projects.filter((project) => project.status === 'Open').length}</strong><span>Open projects</span></article>
-      </section>
+    <section className="hero-panel"><div><p className="eyebrow">Fleet health</p><h2>{assets.length ? `${assets.length} assets under management` : 'Build your asset registry'}</h2><p>{assets.length ? `${attention} asset${attention === 1 ? '' : 's'} currently need attention.` : 'Add your first asset, upload a real photo, and start an inspection.'}</p></div><HealthRing value={average} /></section>
 
-      <section className="quick-grid three-actions">
-        <button type="button" className="quick-action primary" onClick={onAddAsset}>
-          <span>＋</span><strong>Add asset</strong><small>Photo-first onboarding</small>
-        </button>
-        <button type="button" className="quick-action" onClick={onStartInspection}>
-          <span>＋</span><strong>Start inspection</strong><small>Fast field workflow</small>
-        </button>
-        <button type="button" className="quick-action" onClick={onOpenProjects}>
-          <span>◇</span><strong>Continue project</strong><small>Before, during, after</small>
-        </button>
-      </section>
+    <section className="metric-grid"><article><strong>{assets.length}</strong><span>Active assets</span></article><article><strong>{attention}</strong><span>Need attention</span></article><article><strong>{openWork}</strong><span>Open work orders</span></article><article><strong>{data.inspections?.length || 0}</strong><span>Recent inspections</span></article></section>
 
-      <section className="panel">
-        <div className="section-header">
-          <div><p className="eyebrow">Asset registry</p><h2>Current service cycles</h2></div>
-          <span>{assets.length} total</span>
-        </div>
-        <div className="asset-list">
-          {assets.map((asset) => (
-            <button key={asset.id} className="asset-card asset-card-with-photo" type="button" onClick={() => onOpenAsset(asset)}>
-              <div className="registry-photo">
-                {asset.coverPhoto ? <img src={asset.coverPhoto} alt="" /> : <span>▣</span>}
-              </div>
-              <div className="asset-card-content">
-                <div className="asset-card-head">
-                  <div><strong>{asset.name}</strong><small>{asset.id} · {asset.facility}</small></div>
-                  <StatusBadge status={asset.status} />
-                </div>
-                <div className="asset-details-row">
-                  <span><small>Contents</small>{asset.contents}</span>
-                  <span><small>Cycle health</small>{asset.serviceHealth}</span>
-                  <span><small>Next inspection</small>{asset.nextInspection}</span>
-                </div>
-                <div className="progress-track"><span style={{ width: `${asset.serviceHealth}%` }} /></div>
-              </div>
-            </button>
-          ))}
-        </div>
-      </section>
+    <section className="quick-grid"><button onClick={onAddAsset}><span>＋</span><strong>Add asset</strong><small>Register equipment and a cover photo</small></button><button onClick={onInspect}><span>✓</span><strong>Start inspection</strong><small>Capture findings and field photos</small></button><button onClick={onWorkOrders}><span>◇</span><strong>Work orders</strong><small>Turn findings into tracked action</small></button></section>
 
-      <section className="panel">
-        <div className="section-header"><div><p className="eyebrow">Asset history</p><h2>Recent verified activity</h2></div></div>
-        <div className="timeline-list">
-          {timeline.slice(0, 4).map((event) => (
-            <article key={event.id} className="timeline-item">
-              <span className="timeline-dot" />
-              <div><strong>{event.title}</strong><p>{event.detail}</p><small>{event.type} · {event.date} · {event.source}</small></div>
-            </article>
-          ))}
-        </div>
-      </section>
-    </div>
-  )
+    <section className="panel"><div className="section-header"><div><p className="eyebrow">Asset registry</p><h2>Current service health</h2></div></div>{!assets.length ? <div className="empty-state"><strong>No assets yet</strong><p>Add your first asset to begin.</p></div> : <div className="asset-grid">{assets.slice(0, 6).map((asset) => <button className="asset-card" key={asset.id} onClick={() => onOpenAsset(asset)}><div className="asset-thumb">{asset.cover_url ? <img src={asset.cover_url} alt="" /> : <span>▣</span>}</div><div className="asset-card-body"><div className="asset-title-row"><div><strong>{asset.name}</strong><small>{asset.asset_tag} · {asset.facility || 'No facility'}</small></div><StatusBadge status={asset.status} /></div><div className="health-line"><span style={{ width: `${asset.health_score || 0}%` }} /></div><div className="asset-meta"><span>Health <b>{asset.health_score}</b></span><span>Next <b>{formatDate(asset.next_inspection_date)}</b></span></div></div></button>)}</div>}</section>
+
+    <section className="panel"><div className="section-header"><div><p className="eyebrow">Recent activity</p><h2>Latest inspections</h2></div></div>{!data.inspections?.length ? <p className="muted">No inspections recorded yet.</p> : <div className="activity-list">{data.inspections.map((item) => <article key={item.id}><span className="activity-dot"/><div><strong>{item.assets?.name || 'Asset'} · {item.condition}</strong><p>Health score {item.health_score}. Inspection recorded {formatDate(item.inspected_at)}.</p><small>{item.assets?.asset_tag}</small></div></article>)}</div>}</section>
+  </div>
 }

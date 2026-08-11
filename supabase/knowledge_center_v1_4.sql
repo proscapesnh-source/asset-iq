@@ -1,0 +1,2 @@
+-- SUPERSEDED by supabase/migrations/20260807_v1_5_database_foundation.sql
+-- Kept only for release history. Do not run this file on v1.5.
