@@ -60,6 +60,11 @@ function AIResult({ photo, onApply, knowledge }) {
     {analysis.observed && <p><strong>Observed:</strong> {analysis.observed}</p>}
     {analysis.inference && <p><strong>Interpretation:</strong> {analysis.inference}</p>}
     {analysis.previous_repair_evidence && analysis.previous_repair_evidence !== 'Not determined' && <p><strong>Possible prior repair:</strong> {analysis.previous_repair_evidence}</p>}
+    {analysis.subtle_indicators?.length > 0 && <div className="ai-recommendations"><small>Subtle indicators AI noticed</small><ul>{analysis.subtle_indicators.map(item=><li key={item}>{item}</li>)}</ul></div>}
+    {analysis.differential_causes?.length > 0 && <div className="ai-recommendations"><small>Possible causes to differentiate</small><ul>{analysis.differential_causes.map(item=><li key={item}>{item}</li>)}</ul></div>}
+    {analysis.inspect_next?.length > 0 && <div className="ai-recommendations inspect-next"><small>Inspector: check this next</small><ul>{analysis.inspect_next.map(item=><li key={item}>{item}</li>)}</ul></div>}
+    {analysis.inspector_challenge && <div className="ai-review-flag"><strong>AI second opinion:</strong> {analysis.inspector_challenge}</div>}
+    {analysis.compliance_concerns?.length > 0 && <div className="ai-compliance-panel"><strong>Potential standards / code concerns</strong>{analysis.compliance_concerns.map((item,i)=><p key={`${item.concern}-${i}`}><b>{item.concern}</b>{item.reference ? ` · ${item.reference}` : ''}{item.confidence ? ` · ${item.confidence}% confidence` : ''}<br/><small>Verify: {item.verification || 'Confirm applicability and field condition.'}</small></p>)}</div>}
     <p>{analysis.summary}</p>
     {analysis.defects?.length > 0 && <div className="ai-tag-row">{analysis.defects.map((item) => <span key={item}>{item}</span>)}</div>}
     {analysis.recommendations?.length > 0 && <div className="ai-recommendations"><small>Suggested next steps</small><ul>{analysis.recommendations.map((item) => <li key={item}>{item}</li>)}</ul></div>}

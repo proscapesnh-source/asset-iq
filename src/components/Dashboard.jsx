@@ -2,7 +2,7 @@ import HealthRing from './HealthRing'
 import StatusBadge from './StatusBadge'
 import { formatDate } from '../lib/data'
 
-export default function Dashboard({ data, onAddAsset, onOpenAsset, onInspect, onWorkOrders }) {
+export default function Dashboard({ data, onAddAsset, onOpenAsset, onInspect, onWorkOrders, onAssetFilter }) {
   const allAssets = data.assets || []
   const assets = allAssets.filter((item) => !item.dna?.lifecycle_status || ['Active','Out of Service'].includes(item.dna.lifecycle_status))
   const workOrders = data.workOrders || []
@@ -15,7 +15,7 @@ export default function Dashboard({ data, onAddAsset, onOpenAsset, onInspect, on
 
     <section className="hero-panel"><div><p className="eyebrow">Fleet health</p><h2>{assets.length ? `${assets.length} assets under management` : 'Build your asset registry'}</h2><p>{assets.length ? `${attention} asset${attention === 1 ? '' : 's'} currently need attention.` : 'Add your first asset, upload a real photo, and start an inspection.'}</p></div><HealthRing value={average} /></section>
 
-    <section className="metric-grid"><article><strong>{assets.length}</strong><span>Active assets</span></article><article><strong>{attention}</strong><span>Need attention</span></article><article><strong>{openWork}</strong><span>Open work orders</span></article><article><strong>{data.inspections?.length || 0}</strong><span>Recent inspections</span></article></section>
+    <section className="metric-grid"><button className="metric-card-button" onClick={()=>onAssetFilter?.("active")}><strong>{assets.length}</strong><span>Active assets</span><small>View assets →</small></button><button className="metric-card-button" onClick={()=>onAssetFilter?.("attention")}><strong>{attention}</strong><span>Need attention</span><small>Review now →</small></button><button className="metric-card-button" onClick={onWorkOrders}><strong>{openWork}</strong><span>Open work orders</span><small>View work →</small></button><article><strong>{data.inspections?.length || 0}</strong><span>Recent inspections</span></article></section>
 
     <section className="quick-grid"><button onClick={onAddAsset}><span>＋</span><strong>Add asset</strong><small>Register equipment and a cover photo</small></button><button onClick={onInspect}><span>✓</span><strong>Start inspection</strong><small>Capture findings and field photos</small></button><button onClick={onWorkOrders}><span>◇</span><strong>Work orders</strong><small>Turn findings into tracked action</small></button></section>
 

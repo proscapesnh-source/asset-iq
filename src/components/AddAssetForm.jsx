@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 
-const blank = { asset_tag: '', name: '', asset_type: 'Tank / Vessel', facility: '', location: '', contents: '', manufacturer: '', model: '', serial_number: '', install_date: '', next_inspection_date: '', notes: '' }
+const blank = { asset_tag: '', name: '', asset_type: 'Tank / Vessel', site_id: '', facility: '', location: '', contents: '', manufacturer: '', model: '', serial_number: '', install_date: '', next_inspection_date: '', notes: '' }
 
 function normalizeInitial(values = {}) {
   return Object.fromEntries(Object.keys(blank).map((key) => [key, values?.[key] ?? blank[key]]))
 }
 
-export default function AddAssetForm({ onCancel, onSave, initialValues = null, mode = 'create', currentCoverUrl = '' }) {
+export default function AddAssetForm({ onCancel, onSave, initialValues = null, mode = 'create', currentCoverUrl = '', sites = [] }) {
   const editing = mode === 'edit'
   const [form, setForm] = useState(() => normalizeInitial(initialValues))
   const [file, setFile] = useState(null)
@@ -40,7 +40,7 @@ export default function AddAssetForm({ onCancel, onSave, initialValues = null, m
   return <div className="page-stack"><button className="back-button" onClick={onCancel}>← Back</button><div className="page-heading"><div><p className="eyebrow">{editing ? 'Digital asset passport' : 'New digital passport'}</p><h1>{editing ? 'Edit asset' : 'Add asset'}</h1><p>{editing ? 'Update the equipment record without changing inspection history or calculated health.' : 'Create the permanent record and start with a real cover photo.'}</p></div></div><form className="panel form-grid" onSubmit={submit}>
     <label>Asset tag *<input required value={form.asset_tag} onChange={(e) => set('asset_tag', e.target.value)} placeholder="PS-1001" /></label><label>Asset name *<input required value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="North Process Tank" /></label>
     <label>Asset type<select value={form.asset_type} onChange={(e) => set('asset_type', e.target.value)}><option>Tank / Vessel</option><option>Piping</option><option>Scrubber</option><option>Containment</option><option>Process Equipment</option><option>Other</option></select></label><label>Contents<input value={form.contents} onChange={(e) => set('contents', e.target.value)} placeholder="Water, acid, fuel…" /></label>
-    <label>Facility<input value={form.facility} onChange={(e) => set('facility', e.target.value)} /></label><label>Location<input value={form.location} onChange={(e) => set('location', e.target.value)} placeholder="Building / area / coordinates" /></label>
+    <label>Site / Facility<select value={form.site_id || ''} onChange={(e) => { const site = sites.find(s => s.id === e.target.value); setForm(current => ({ ...current, site_id:e.target.value, facility:site?.name || current.facility })) }}><option value="">Legacy / unassigned</option>{sites.map(site => <option key={site.id} value={site.id}>{site.name}</option>)}</select></label><label>Location<input value={form.location} onChange={(e) => set('location', e.target.value)} placeholder="Building / area / coordinates" /></label>
     <label>Manufacturer<input value={form.manufacturer} onChange={(e) => set('manufacturer', e.target.value)} /></label><label>Model<input value={form.model} onChange={(e) => set('model', e.target.value)} /></label>
     <label>Serial number<input value={form.serial_number} onChange={(e) => set('serial_number', e.target.value)} /></label><label>Install date<input type="date" value={form.install_date || ''} onChange={(e) => set('install_date', e.target.value)} /></label>
     <label>Next inspection<input type="date" value={form.next_inspection_date || ''} onChange={(e) => set('next_inspection_date', e.target.value)} /></label><label>{editing ? 'Replace cover photo' : 'Cover photo'}<input type="file" accept="image/*" onChange={choosePhoto} /></label>

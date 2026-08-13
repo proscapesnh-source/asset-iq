@@ -42,9 +42,9 @@ export async function analyzeInspectionPhoto(photo, asset, knowledge = {}) {
       },
       knowledge: {
         coatings: (knowledge.coatings || []).slice(0, 20).map((x) => ({ manufacturer:x.manufacturer, product_name:x.product_name, coating_family:x.coating_family, color:x.color, dft_range:x.dft_range, service_environment:x.service_environment, visual_characteristics:x.visual_characteristics, failure_modes:x.failure_modes, repair_guidance:x.repair_guidance })),
-        failures: (knowledge.failures || []).slice(0, 25).map((x) => ({ name:x.name, category:x.category, visual_indicators:x.visual_indicators, severity_guidance:x.severity_guidance, verification:x.verification })),
+        failures: (knowledge.failures || []).slice(0, 45).map((x) => ({ name:x.name, category:x.category, visual_indicators:x.visual_indicators, severity_guidance:x.severity_guidance, verification:x.verification })),
         repairs: (knowledge.repairs || []).slice(0, 15).map((x) => ({ name:x.name, compatible_families:x.compatible_families, surface_prep:x.surface_prep, procedure:x.procedure, qa_qc:x.qa_qc, limitations:x.limitations })),
-        standards: (knowledge.standards || []).slice(0, 10).map((x) => ({ name:x.name, source:x.source, version:x.version, scope:x.scope, guidance:x.guidance })),
+        standards: (knowledge.standards || []).slice(0, 20).map((x) => ({ name:x.name, source:x.source, version:x.version, scope:x.scope, guidance:x.guidance })),
       },
     }),
   })

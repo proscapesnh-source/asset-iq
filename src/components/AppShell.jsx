@@ -18,6 +18,7 @@ export default function AppShell({ organizationName, userEmail, role, active, on
   const items = [
     ['dashboard', '⌂', 'Dashboard'],
     ['assets', '▣', 'Assets'],
+    ['sites', '⌖', 'Sites'],
     ['inspect', '＋', 'Inspect'],
     ['work', '◇', 'Work Orders'],
     ['knowledge', '✦', 'Knowledge'],

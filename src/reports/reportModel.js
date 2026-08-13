@@ -38,15 +38,38 @@ export function conditionSummary(inspection, asset) {
   return `${asset.name} was assessed in ${condition} overall condition with a PolyShield health score of ${inspection.health_score}/100. ${recommendationFor(inspection)}`
 }
 
+export function stripInternalAIText(text = '') {
+  const value = String(text || '').trim()
+  if (!value) return ''
+  // Internal inspector metadata must never appear in customer-facing reports.
+  return value
+    .replace(/^AI reviewed\s*·\s*Severity\s+[^·]+\s*·\s*Confidence\s+\d+%\s*·\s*/i, '')
+    .replace(/^AI reviewed\s*·\s*/i, '')
+    .trim()
+}
+
+function splitPhotoNotes(notes = '') {
+  const value = stripInternalAIText(notes)
+  if (!value) return { observation: '', recommendation: '' }
+  const marker = /\s*Recommended next steps:\s*/i
+  const parts = value.split(marker)
+  const observation = (parts.shift() || '').trim()
+  const recommendation = parts.join(' Recommended next steps: ').trim().replace(/[.;]\s*$/, '')
+  return { observation, recommendation }
+}
+
 export function buildFindings(inspection) {
   if (inspection.photos?.length) {
-    return inspection.photos.map((photo, index) => ({
-      id: photo.id || index,
-      component: photo.title || photo.category || `Photo ${index + 1}`,
-      condition: photo.notes || photo.annotation_note || inspection.condition || 'Recorded observation',
-      severity: riskFromInspection(inspection).level,
-      recommendation: photo.annotation_note || recommendationFor(inspection),
-    }))
+    return inspection.photos.map((photo, index) => {
+      const parsed = splitPhotoNotes(photo.notes || '')
+      return {
+        id: photo.id || index,
+        component: photo.title || photo.category || `Photo ${index + 1}`,
+        condition: parsed.observation || stripInternalAIText(photo.annotation_note) || inspection.condition || 'Recorded observation',
+        severity: riskFromInspection(inspection).level,
+        recommendation: parsed.recommendation || recommendationFor(inspection),
+      }
+    })
   }
   return [{
     id: 'overall',

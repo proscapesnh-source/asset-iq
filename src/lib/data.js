@@ -65,7 +65,7 @@ export async function loadContext() {
 
   const { data: membership, error } = await supabase
     .from('organization_members')
-    .select('organization_id, role, organizations(name)')
+    .select('organization_id, role, organizations(name, report_display_name, logo_storage_path)')
     .eq('user_id', user.id)
     .limit(1)
     .single()
@@ -75,10 +75,61 @@ export async function loadContext() {
     user,
     organizationId: membership.organization_id,
     organizationName: membership.organizations?.name || 'Organization',
+    organization: membership.organizations || { name: 'Organization' },
     role: membership.role,
   }
 }
 
+
+export async function fetchSites(organizationId) {
+  const { data, error } = await supabase.from('sites').select('*').eq('organization_id', organizationId).eq('active', true).order('name')
+  if (error) {
+    if (error.code === '42P01' || /does not exist/i.test(error.message || '')) return []
+    throw error
+  }
+  return data || []
+}
+
+export async function createSite(organizationId, form) {
+  const payload = Object.fromEntries(Object.entries(form).map(([k,v]) => [k, typeof v === 'string' ? v.trim() || null : v]))
+  const { data, error } = await supabase.from('sites').insert({ organization_id: organizationId, ...payload }).select('*').single()
+  if (error) throw error
+  return data
+}
+
+export async function fetchOrganizationProfile(organizationId) {
+  let result = await supabase.from('organizations').select('id,name,report_display_name,logo_storage_path').eq('id', organizationId).single()
+  if (result.error && (result.error.code === '42703' || /column .* does not exist/i.test(result.error.message || ''))) {
+    result = await supabase.from('organizations').select('id,name').eq('id', organizationId).single()
+  }
+  if (result.error) throw result.error
+  const data = result.data
+  return { ...data, logo_url: data.logo_storage_path ? await getSignedUrl(data.logo_storage_path) : null }
+}
+
+export async function updateOrganizationProfile(organizationId, updates, logoFile = null) {
+  const payload = { ...updates }
+  if (logoFile) payload.logo_storage_path = await uploadImage(logoFile, organizationId, 'organization-branding')
+  const { data, error } = await supabase
+    .from('organizations')
+    .update(payload)
+    .eq('id', organizationId)
+    .select('id,name,report_display_name,logo_storage_path')
+    .maybeSingle()
+  if (error) throw error
+  if (!data) throw new Error('Organization branding could not be updated. Confirm the v2.4.1 organization branding permission migration has been run.')
+  return { ...data, logo_url: data.logo_storage_path ? await getSignedUrl(data.logo_storage_path) : null }
+}
+
+export function similarRepairCases(assets, currentAsset, limit = 8) {
+  const currentEvents = currentAsset?.service_events || []
+  const terms = new Set(currentEvents.flatMap(e => `${e.event_type || ''} ${e.area || ''} ${e.description || ''}`.toLowerCase().split(/\W+/)).filter(x => x.length > 3))
+  return (assets || []).filter(a => a.id !== currentAsset?.id && a.site_id !== currentAsset?.site_id).map(asset => {
+    const events = asset.service_events || []
+    const score = events.reduce((n,e) => n + `${e.event_type || ''} ${e.area || ''} ${e.description || ''}`.toLowerCase().split(/\W+/).filter(x => terms.has(x)).length, 0)
+    return { asset, events, score }
+  }).filter(x => x.score > 0).sort((a,b)=>b.score-a.score).slice(0,limit)
+}
 export async function fetchAssets(organizationId) {
   const { data: assets, error } = await supabase
     .from('assets')
@@ -131,7 +182,8 @@ export async function createAsset(organizationId, form, coverFile) {
       asset_tag: form.asset_tag.trim(),
       name: form.name.trim(),
       asset_type: form.asset_type,
-      facility: form.facility.trim() || null,
+      facility: form.facility?.trim() || null,
+      site_id: form.site_id || null,
       location: form.location.trim() || null,
       contents: form.contents.trim() || null,
       manufacturer: form.manufacturer.trim() || null,

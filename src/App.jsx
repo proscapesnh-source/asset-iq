@@ -9,8 +9,10 @@ import AssetDetail from './components/AssetDetail'
 import WorkOrders from './components/WorkOrders'
 import KnowledgeCenter from './components/KnowledgeCenter'
 import SupervisorDashboard from './components/SupervisorDashboard'
+import Sites from './components/Sites'
+import OrganizationProfile from './components/OrganizationProfile'
 import { supabase } from './lib/supabase'
-import { addAssetPhoto, createAsset, createInspection, createWorkOrder, fetchAssetDetail, fetchAssets, fetchDashboard, fetchWorkOrders, loadContext, setCoverPhoto, updateWorkOrder, fetchKnowledgeBase, createKnowledgeRecord, deleteKnowledgeRecord, seedKnowledgeBase, saveAssetDNA, createAssetServiceEvent, updateAssetLifecycleStatus, createAssetLifecycleEvent, logActivity, createQRTagOrder, updateAsset, createAssetComponent, updateAssetComponent, deleteAssetComponent, retireAssetComponent, restoreAssetComponent } from './lib/data'
+import { addAssetPhoto, createAsset, createInspection, createWorkOrder, fetchAssetDetail, fetchAssets, fetchDashboard, fetchWorkOrders, loadContext, setCoverPhoto, updateWorkOrder, fetchKnowledgeBase, createKnowledgeRecord, deleteKnowledgeRecord, seedKnowledgeBase, saveAssetDNA, createAssetServiceEvent, updateAssetLifecycleStatus, createAssetLifecycleEvent, logActivity, createQRTagOrder, updateAsset, createAssetComponent, updateAssetComponent, deleteAssetComponent, retireAssetComponent, restoreAssetComponent, fetchSites, createSite, fetchOrganizationProfile, updateOrganizationProfile, similarRepairCases } from './lib/data'
 
 export default function App() {
   const [session, setSession] = useState(undefined)
@@ -19,6 +21,10 @@ export default function App() {
   const [assets, setAssets] = useState([])
   const [dashboard, setDashboard] = useState({ assets: [], workOrders: [], inspections: [] })
   const [workOrders, setWorkOrders] = useState([])
+  const [sites, setSites] = useState([])
+  const [organizationProfile, setOrganizationProfile] = useState(null)
+  const [assetFilter, setAssetFilter] = useState(null)
+  const [siteFilter, setSiteFilter] = useState('All')
   const [knowledge, setKnowledge] = useState({ coatings: [], failures: [], repairs: [], standards: [] })
   const [selectedAsset, setSelectedAsset] = useState(null)
   const [assetDetail, setAssetDetail] = useState(null)
@@ -39,12 +45,14 @@ export default function App() {
     setLoading(true); setFatalError('')
     try {
       // Core asset data must never be hidden by an optional Knowledge Center problem.
-      const [dash, allAssets, allWork] = await Promise.all([
+      const [dash, allAssets, allWork, allSites, orgProfile] = await Promise.all([
         fetchDashboard(ctx.organizationId),
         fetchAssets(ctx.organizationId),
         fetchWorkOrders(ctx.organizationId),
+        fetchSites(ctx.organizationId),
+        fetchOrganizationProfile(ctx.organizationId),
       ])
-      setDashboard(dash); setAssets(allAssets); setWorkOrders(allWork)
+      setDashboard(dash); setAssets(allAssets); setWorkOrders(allWork); setSites(allSites); setOrganizationProfile(orgProfile)
 
       try {
         const kb = await fetchKnowledgeBase(ctx.organizationId)
@@ -83,6 +91,7 @@ export default function App() {
   }, [session])
 
   const navigate = (next) => {
+    if (next !== 'assets') setAssetFilter(null)
     if (next === 'inspect' && !assets.length) { setView('add-asset'); return }
     setSelectedAsset(null); setAssetDetail(null); setView(next)
     const url = new URL(window.location.href); url.searchParams.delete('asset'); window.history.replaceState({}, '', url)
@@ -115,16 +124,17 @@ export default function App() {
   return <AppShell organizationName={context.organizationName} userEmail={context.user.email} role={context.role} active={active} onNavigate={navigate} onSignOut={() => supabase.auth.signOut()}>
     {loading && <div className="loading-bar"/>}
     {fatalError && <div className="error-banner">{fatalError}<button onClick={() => refreshAll()}>Retry</button></div>}
-    {view === 'dashboard' && <Dashboard data={dashboard} onAddAsset={() => setView('add-asset')} onOpenAsset={openAsset} onInspect={() => setView('inspect')} onWorkOrders={() => setView('work')} />}
-    {view === 'assets' && <AssetsRegistry assets={assets} onAdd={() => setView('add-asset')} onOpen={openAsset} onInspect={(asset) => { setSelectedAsset(asset); setView('inspect') }} />}
-    {view === 'add-asset' && <AddAssetForm onCancel={() => navigate('assets')} onSave={async (form, file) => { const asset = await createAsset(context.organizationId, form, file); await refreshAll(); flash('Asset created.'); await openAsset(asset) }} />}
+    {view === 'dashboard' && <Dashboard data={dashboard} onAddAsset={() => setView('add-asset')} onOpenAsset={openAsset} onInspect={() => setView('inspect')} onWorkOrders={() => setView('work')} onAssetFilter={(filter)=>{setAssetFilter(filter);setSiteFilter('All');setView('assets')}} />}
+    {view === 'assets' && <AssetsRegistry assets={assets} sites={sites} initialFilter={assetFilter} initialSiteId={siteFilter} onAdd={() => setView('add-asset')} onOpen={openAsset} onInspect={(asset) => { setSelectedAsset(asset); setView('inspect') }} />}
+    {view === 'add-asset' && <AddAssetForm sites={sites} onCancel={() => navigate('assets')} onSave={async (form, file) => { const asset = await createAsset(context.organizationId, form, file); await refreshAll(); flash('Asset created.'); await openAsset(asset) }} />}
 
-    {view === 'edit-asset' && selectedAsset && <AddAssetForm mode="edit" initialValues={selectedAsset} currentCoverUrl={selectedAsset.cover_url || ''} onCancel={() => openAsset(selectedAsset)} onSave={async (form, file) => {
+    {view === 'edit-asset' && selectedAsset && <AddAssetForm sites={sites} mode="edit" initialValues={selectedAsset} currentCoverUrl={selectedAsset.cover_url || ''} onCancel={() => openAsset(selectedAsset)} onSave={async (form, file) => {
       const updates = {
         asset_tag: form.asset_tag.trim(),
         name: form.name.trim(),
         asset_type: form.asset_type,
-        facility: form.facility.trim() || null,
+        facility: form.facility?.trim() || null,
+        site_id: form.site_id || null,
         location: form.location.trim() || null,
         contents: form.contents.trim() || null,
         manufacturer: form.manufacturer.trim() || null,
@@ -140,7 +150,8 @@ export default function App() {
       await refreshAll(); flash('Asset updated.'); await openAsset(updated)
     }} />}
     {view === 'inspect' && <InspectionForm knowledge={knowledge} asset={selectedAsset} assets={assets} onCancel={() => selectedAsset ? openAsset(selectedAsset) : navigate('dashboard')} onSave={async (asset, form, photos) => { const inspection = await createInspection({ organizationId: context.organizationId, userId: context.user.id, asset, form, photos }); await logActivity(context.organizationId, context.user.id, 'inspection_completed', `Inspection completed for ${asset.name}`, 'inspection', inspection.id, { asset_id: asset.id, condition: form.condition }); await refreshAll(); flash('Inspection saved to the asset record.'); await openAsset(asset) }} />}
-    {view === 'asset-detail' && assetDetail && <AssetDetail detail={assetDetail} organizationName={context.organizationName} inspectorEmail={context.user.email} onBack={() => navigate('assets')} onInspect={(asset) => { setSelectedAsset(asset); setView('inspect') }} onEdit={(asset) => { setSelectedAsset(asset); setView('edit-asset') }} onAddPhoto={(file, caption, cover) => addAssetPhoto(context.organizationId, selectedAsset.id, file, caption, cover)} onSetCover={(photoId) => setCoverPhoto(selectedAsset.id, photoId)} onSaveDNA={(form) => saveAssetDNA(context.organizationId, selectedAsset.id, form)} onAddServiceEvent={(form) => createAssetServiceEvent(context.organizationId, selectedAsset.id, form)} onSaveLifecycleStatus={(status) => updateAssetLifecycleStatus(context.organizationId, selectedAsset.id, status)} onAddLifecycleEvent={(form) => createAssetLifecycleEvent(context.organizationId, selectedAsset.id, form)} onOrderQRTag={async (form) => { const order = await createQRTagOrder(context.organizationId, selectedAsset.id, context.user.id, form); await logActivity(context.organizationId, context.user.id, 'qr_tag_order_submitted', `QR tag order submitted for ${selectedAsset.name}`, 'asset', selectedAsset.id, { order_id: order.id, material: form.material, quantity: form.quantity }); flash('QR tag order submitted.'); return order }} onCreateComponent={async (form, photoFile) => { const item = await createAssetComponent(context.organizationId, selectedAsset.id, form, photoFile); await logActivity(context.organizationId, context.user.id, 'component_created', `Component added to ${selectedAsset.name}: ${item.name}`, 'asset', selectedAsset.id, { component_id: item.id }); flash('Component added.'); return item }} onUpdateComponent={async (id, form, photoFile, existingPhotoPath) => { const item = await updateAssetComponent(id, form, context.organizationId, selectedAsset.id, photoFile, existingPhotoPath); flash('Component updated.'); return item }} onDeleteComponent={async (id) => { await deleteAssetComponent(id); flash('Component permanently deleted.') }} onRetireComponent={async (id, reason) => { await retireAssetComponent(id, reason); flash('Component retired from service. History preserved.') }} onRestoreComponent={async (id) => { await restoreAssetComponent(id); flash('Component restored to active service.') }} onRefresh={async () => { await refreshSelectedAsset(); await refreshAll() }} />}
+    {view === 'asset-detail' && assetDetail && <AssetDetail detail={assetDetail} organizationName={context.organizationName} organizationProfile={organizationProfile} allAssets={assets} similarRepairs={similarRepairCases(assets, assetDetail.asset)} inspectorEmail={context.user.email} onBack={() => navigate('assets')} onInspect={(asset) => { setSelectedAsset(asset); setView('inspect') }} onEdit={(asset) => { setSelectedAsset(asset); setView('edit-asset') }} onAddPhoto={(file, caption, cover) => addAssetPhoto(context.organizationId, assetDetail.asset.id, file, caption, cover)} onSetCover={(photoId) => setCoverPhoto(selectedAsset.id, photoId)} onSaveDNA={(form) => saveAssetDNA(context.organizationId, selectedAsset.id, form)} onAddServiceEvent={(form) => createAssetServiceEvent(context.organizationId, selectedAsset.id, form)} onSaveLifecycleStatus={(status) => updateAssetLifecycleStatus(context.organizationId, selectedAsset.id, status)} onAddLifecycleEvent={(form) => createAssetLifecycleEvent(context.organizationId, selectedAsset.id, form)} onOrderQRTag={async (form) => { const order = await createQRTagOrder(context.organizationId, selectedAsset.id, context.user.id, form); await logActivity(context.organizationId, context.user.id, 'qr_tag_order_submitted', `QR tag order submitted for ${selectedAsset.name}`, 'asset', selectedAsset.id, { order_id: order.id, material: form.material, quantity: form.quantity }); flash('QR tag order submitted.'); return order }} onCreateComponent={async (form, photoFile) => { const item = await createAssetComponent(context.organizationId, selectedAsset.id, form, photoFile); await logActivity(context.organizationId, context.user.id, 'component_created', `Component added to ${selectedAsset.name}: ${item.name}`, 'asset', selectedAsset.id, { component_id: item.id }); flash('Component added.'); return item }} onUpdateComponent={async (id, form, photoFile, existingPhotoPath) => { const item = await updateAssetComponent(id, form, context.organizationId, selectedAsset.id, photoFile, existingPhotoPath); flash('Component updated.'); return item }} onDeleteComponent={async (id) => { await deleteAssetComponent(id); flash('Component permanently deleted.') }} onRetireComponent={async (id, reason) => { await retireAssetComponent(id, reason); flash('Component retired from service. History preserved.') }} onRestoreComponent={async (id) => { await restoreAssetComponent(id); flash('Component restored to active service.') }} onReportGenerated={async (inspection, kind) => { await logActivity(context.organizationId, context.user.id, kind === 'print' ? 'inspection_report_printed' : 'inspection_report_generated', `${kind === 'print' ? 'Inspection report printed' : 'Inspection report generated'} for ${assetDetail.asset.name}`, 'inspection', inspection.id, { asset_id: assetDetail.asset.id, asset_tag: assetDetail.asset.asset_tag, report_format: kind, email: context.user.email }); await refreshAll() }} onRefresh={async () => { await refreshSelectedAsset(); await refreshAll() }} />}
+    {view === 'sites' && <><Sites sites={sites} assets={assets} canManage={['owner','admin','manager','supervisor'].includes(context.role)} onCreate={async(form)=>{await createSite(context.organizationId,form);await refreshAll();flash('Site created.')}} onOpenAssets={(siteId)=>{setAssetFilter(null);setSiteFilter(siteId);setView('assets')}}/><OrganizationProfile organization={organizationProfile} canManage={['owner','admin'].includes(context.role)} onSave={async(updates,file)=>{await updateOrganizationProfile(context.organizationId,updates,file);await refreshAll();flash('Organization branding saved.')}}/></>}
     {view === 'knowledge' && <KnowledgeCenter knowledge={knowledge} onCreate={async (library, record) => { await createKnowledgeRecord(context.organizationId, library, record); await refreshAll(); flash('Knowledge record saved.') }} onDelete={async (library, id) => { await deleteKnowledgeRecord(library, id); await refreshAll(); flash('Knowledge record removed.') }} onSeed={async (starter) => { await seedKnowledgeBase(context.organizationId, starter); await refreshAll(); flash('Starter inspection knowledge loaded.') }} />}
     {view === 'supervisor' && <SupervisorDashboard data={dashboard} role={context.role} />}
     {view === 'work' && <WorkOrders workOrders={workOrders} assets={assets} onCreate={async (form) => { await createWorkOrder(context.organizationId, form); await refreshAll(); flash('Work order created.') }} onUpdate={async (id, updates) => { await updateWorkOrder(id, updates); await refreshAll(); flash('Work order updated.') }} />}

@@ -75,7 +75,7 @@ export default function InspectionReport({ asset, inspection, organizationName, 
         {!inspection.photos?.length ? <p className="muted">No photographs were attached to this inspection.</p> : <div className="report-photo-grid">
           {inspection.photos.map((photo, index) => <figure key={photo.id}>
             <div className="report-photo-frame"><img src={photo.url} alt={photo.title || `Inspection photo ${index + 1}`}/><b>PHOTO {String(index + 1).padStart(2, '0')}</b></div>
-            <figcaption><strong>{photo.title || photo.file_name}</strong><span>{photo.category || 'Inspection evidence'}</span>{photo.notes && <p>{photo.notes}</p>}{photo.annotation_note && <p><b>Marked observation:</b> {photo.annotation_note}</p>}</figcaption>
+            <figcaption><strong>{photo.title || photo.file_name}</strong><span>{photo.category || 'Inspection evidence'}</span></figcaption>
           </figure>)}
         </div>}
       </section>
