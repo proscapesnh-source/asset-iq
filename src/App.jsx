@@ -11,8 +11,10 @@ import KnowledgeCenter from './components/KnowledgeCenter'
 import SupervisorDashboard from './components/SupervisorDashboard'
 import Sites from './components/Sites'
 import OrganizationProfile from './components/OrganizationProfile'
+import QRAssetPassport from './components/QRAssetPassport'
 import { supabase } from './lib/supabase'
-import { addAssetPhoto, createAsset, createInspection, createWorkOrder, fetchAssetDetail, fetchAssets, fetchDashboard, fetchWorkOrders, loadContext, setCoverPhoto, updateWorkOrder, fetchKnowledgeBase, createKnowledgeRecord, deleteKnowledgeRecord, seedKnowledgeBase, saveAssetDNA, createAssetServiceEvent, updateAssetLifecycleStatus, createAssetLifecycleEvent, logActivity, createQRTagOrder, updateAsset, createAssetComponent, updateAssetComponent, deleteAssetComponent, retireAssetComponent, restoreAssetComponent, fetchSites, createSite, fetchOrganizationProfile, updateOrganizationProfile, similarRepairCases } from './lib/data'
+import { addAssetPhoto, createAsset, createInspection, createWorkOrder, fetchAssetDetail, fetchAssets, fetchDashboard, fetchWorkOrders, loadContext, setCoverPhoto, updateWorkOrder, fetchKnowledgeBase, createKnowledgeRecord, deleteKnowledgeRecord, seedKnowledgeBase, saveAssetDNA, createAssetServiceEvent, updateAssetLifecycleStatus, createAssetLifecycleEvent, logActivity, createQRTagOrder, updateAsset, createAssetComponent, updateAssetComponent, deleteAssetComponent, retireAssetComponent, restoreAssetComponent, fetchSites, createSite, fetchOrganizationProfile, updateOrganizationProfile, similarRepairCases, fetchQRAssetPassport } from './lib/data'
+import { clearPendingAsset, getLinkedAssetId } from './lib/auth'
 
 export default function App() {
   const [session, setSession] = useState(undefined)
@@ -31,10 +33,12 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [fatalError, setFatalError] = useState('')
   const [toast, setToast] = useState('')
+  const [passwordRecovery, setPasswordRecovery] = useState(false)
+  const [qrPassport, setQrPassport] = useState(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data, error }) => { if (error) console.error(error); setSession(data.session || null) })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, next) => setSession(next))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, next) => { if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true); setSession(next) })
     return () => subscription.unsubscribe()
   }, [])
 
@@ -78,12 +82,19 @@ export default function App() {
         setContext(ctx)
         await refreshAll(ctx)
         await logActivity(ctx.organizationId, ctx.user.id, 'session_started', `Signed in to PolyShield Asset IQ`, null, null, { email: ctx.user.email })
-        const linkedAssetId = new URLSearchParams(window.location.search).get('asset')
+        const linkedAssetId = getLinkedAssetId()
         if (linkedAssetId) {
           try {
             const detail = await fetchAssetDetail(ctx.organizationId, linkedAssetId)
-            if (alive) { setSelectedAsset(detail.asset); setAssetDetail(detail); setView('asset-detail') }
-          } catch { /* Ignore invalid deep links */ }
+            if (alive) { setSelectedAsset(detail.asset); setAssetDetail(detail); setView('asset-detail'); clearPendingAsset() }
+          } catch {
+            try {
+              const passport = await fetchQRAssetPassport(linkedAssetId)
+              if (alive) { setQrPassport(passport); clearPendingAsset() }
+            } catch (qrError) {
+              console.warn('QR passport unavailable:', qrError.message)
+            }
+          }
         }
       } catch (error) { if (alive) setFatalError(`${error.message}. Make sure you ran supabase/setup.sql in the new Supabase project.`) }
     })()
@@ -115,6 +126,8 @@ export default function App() {
 
   if (session === undefined) return <div className="full-loading">Loading PolyShield Asset IQ…</div>
   if (!session) return <AuthScreen />
+  if (passwordRecovery) return <AuthScreen recovery onRecoveryComplete={() => setPasswordRecovery(false)} />
+  if (qrPassport) return <QRAssetPassport passport={qrPassport} onClose={() => { setQrPassport(null); const url = new URL(window.location.href); url.searchParams.delete('asset'); window.history.replaceState({}, '', url) }} />
 
   if (fatalError && !context) return <main className="setup-error"><section><h1>Setup needed</h1><p>{fatalError}</p><button className="secondary-button" onClick={() => window.location.reload()}>Try again</button><button className="text-button" onClick={() => supabase.auth.signOut()}>Sign out</button></section></main>
   if (!context) return <div className="full-loading">Preparing your organization…</div>

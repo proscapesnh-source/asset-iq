@@ -22,7 +22,7 @@ function fileToCompressedDataUrl(file, maxDimension = 1600, quality = 0.8) {
   })
 }
 
-export async function analyzeInspectionPhoto(photo, asset, knowledge = {}) {
+export async function analyzeInspectionPhoto(photo, asset, knowledge = {}, inspectorCorrection = null) {
   const imageDataUrl = await fileToCompressedDataUrl(photo.file)
   const response = await fetch('/api/analyze-photo', {
     method: 'POST',
@@ -40,6 +40,7 @@ export async function analyzeInspectionPhoto(photo, asset, knowledge = {}) {
         dna: asset?.dna || null,
         service_events: (asset?.service_events || []).slice(0, 20),
       },
+      inspectorCorrection,
       knowledge: {
         coatings: (knowledge.coatings || []).slice(0, 20).map((x) => ({ manufacturer:x.manufacturer, product_name:x.product_name, coating_family:x.coating_family, color:x.color, dft_range:x.dft_range, service_environment:x.service_environment, visual_characteristics:x.visual_characteristics, failure_modes:x.failure_modes, repair_guidance:x.repair_guidance })),
         failures: (knowledge.failures || []).slice(0, 45).map((x) => ({ name:x.name, category:x.category, visual_indicators:x.visual_indicators, severity_guidance:x.severity_guidance, verification:x.verification })),

@@ -149,6 +149,8 @@ export async function analyzePhotoPayload(payload, env = process.env) {
   const assetContext = payload?.asset || {}
   const knowledge = payload?.knowledge || {}
   const knowledgeText = JSON.stringify(knowledge).slice(0, 18000)
+  const inspectorCorrection = payload?.inspectorCorrection || null
+  const correctionText = inspectorCorrection ? JSON.stringify(inspectorCorrection).slice(0, 6000) : 'None supplied'
   const prompt = `You are the visual inspection assistant inside PolyShield Asset IQ, an industrial asset inspection application.
 Analyze this single inspection photograph and return ONLY a JSON object.
 
@@ -164,10 +166,14 @@ Asset context:
 Organization-approved Knowledge Center records (may be empty):
 ${knowledgeText}
 
+Technician correction from the field (authoritative for explicitly corrected fields; re-evaluate the rest of the image around it):
+${correctionText}
+
 Built-in PolyShield coating-failure expert guide (curated visual reasoning; use as hypotheses, not proof):
 ${COATING_FAILURE_EXPERT_GUIDE}
 
 Rules:
+- If a technician correction is supplied, treat the explicitly corrected fields and correction note as field-verified context. Do not argue the corrected item back to the prior AI guess unless the correction is internally impossible; instead update the analysis and explain any remaining uncertainty.
 - Your goal is not merely to label obvious defects. Look for subtle, secondary, spatial, pattern, edge, weld, staining, discoloration, deformation, shadow, texture, blister-density, corrosion-migration, fastener, nozzle, support, drainage, access, and previous-repair clues an experienced inspector might overlook.
 - Before settling on a generic label such as stain, discoloration, dark spot, residue, or damage, compare the morphology/location against the built-in expert guide and organization failure library. Prefer the most technically specific visually-supported term, while preserving uncertainty when alternatives remain.
 - Scan the whole frame systematically: center, edges, welds/seams, penetrations/nozzles, fasteners, supports, floor-to-wall transitions, liquid line, splash zone, repair boundaries, and areas with color/texture change.

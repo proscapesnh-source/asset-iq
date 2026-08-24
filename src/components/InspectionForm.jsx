@@ -41,21 +41,42 @@ function DictationTextarea({ label, value, onChange, rows = 3, placeholder = '' 
   return <label className="dictation-field">{label}<textarea rows={rows} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}/><button type="button" className={listening ? 'dictation-button listening' : 'dictation-button'} onClick={dictate}>{listening ? '■ Stop dictation' : '🎤 Talk to text'}</button>{message && <small className="field-help">{message}</small>}</label>
 }
 
-function AIResult({ photo, onApply, knowledge }) {
+function AIResult({ photo, onApply, onCorrect, onReanalyze, knowledge }) {
   const analysis = photo.ai_analysis
+  const [editing, setEditing] = useState(false)
+  const [correction, setCorrection] = useState(null)
+
+  useEffect(() => {
+    if (!analysis) return
+    setCorrection({
+      title: analysis.title || '',
+      severity: analysis.severity || 'Unknown',
+      component: analysis.component || '',
+      surface: analysis.surface || 'Unknown',
+      coating_condition: analysis.coating_condition || '',
+      defects: (analysis.defects || []).join(', '),
+      summary: analysis.summary || '',
+      correction_note: photo.ai_correction?.correction_note || '',
+    })
+  }, [analysis])
+
   if (photo.ai_busy) return <div className="ai-photo-panel loading"><strong>Analyzing photo…</strong><p>Checking visible coating and corrosion conditions.</p></div>
   if (photo.ai_error) return <div className="ai-photo-panel error"><strong>AI analysis unavailable</strong><p>{photo.ai_error}</p></div>
   if (!analysis) return null
 
+  const saveCorrection = (reanalyze = false) => {
+    if (!correction) return
+    const normalized = { ...correction, defects: correction.defects.split(',').map(x=>x.trim()).filter(Boolean) }
+    if (reanalyze) onReanalyze(normalized)
+    else onCorrect(normalized)
+    setEditing(false)
+  }
+
   return <div className={`ai-photo-panel severity-${String(analysis.severity || 'unknown').toLowerCase()}`}>
-    <div className="ai-photo-heading"><div><span className="ai-chip">AI draft</span><strong>{analysis.title}</strong></div><span>{analysis.confidence}% confidence</span></div>
-    <div className="ai-grounding-note"><strong>Knowledge grounded:</strong> {(knowledge?.coatings?.length || 0)} coating systems · {(knowledge?.failures?.length || 0)} failure modes · {(knowledge?.repairs?.length || 0)} repair methods</div><div className="ai-photo-grid">
-      <span><small>Severity</small><strong>{analysis.severity}</strong></span>
-      <span><small>Area</small><strong>{analysis.component}</strong></span>
-      <span><small>Surface</small><strong>{analysis.surface}</strong></span>
-      <span><small>Coating condition</small><strong>{analysis.coating_condition}</strong></span>
-      <span><small>Likely coating family</small><strong>{analysis.probable_coating_family || 'Not determined'}</strong></span>
-      <span><small>Product match</small><strong>{analysis.matched_product || 'Not confirmed'}</strong></span>
+    <div className="ai-photo-heading"><div><span className="ai-chip">{photo.ai_corrected ? 'Technician corrected' : 'AI draft'}</span><strong>{analysis.title}</strong></div><span>{analysis.confidence}% confidence</span></div>
+    <div className="ai-grounding-note"><strong>Knowledge grounded:</strong> {(knowledge?.coatings?.length || 0)} coating systems · {(knowledge?.failures?.length || 0)} failure modes · {(knowledge?.repairs?.length || 0)} repair methods</div>
+    <div className="ai-photo-grid">
+      <span><small>Severity</small><strong>{analysis.severity}</strong></span><span><small>Area</small><strong>{analysis.component}</strong></span><span><small>Surface</small><strong>{analysis.surface}</strong></span><span><small>Coating condition</small><strong>{analysis.coating_condition}</strong></span><span><small>Likely coating family</small><strong>{analysis.probable_coating_family || 'Not determined'}</strong></span><span><small>Product match</small><strong>{analysis.matched_product || 'Not confirmed'}</strong></span>
     </div>
     {analysis.observed && <p><strong>Observed:</strong> {analysis.observed}</p>}
     {analysis.inference && <p><strong>Interpretation:</strong> {analysis.inference}</p>}
@@ -70,10 +91,15 @@ function AIResult({ photo, onApply, knowledge }) {
     {analysis.recommendations?.length > 0 && <div className="ai-recommendations"><small>Suggested next steps</small><ul>{analysis.recommendations.map((item) => <li key={item}>{item}</li>)}</ul></div>}
     {analysis.engineering_review && <div className="ai-review-flag">Qualified engineering review suggested.</div>}
     <small className="ai-limitations">{analysis.limitations}</small>
-    <button type="button" className="secondary-button ai-apply" onClick={onApply}>Apply AI draft to photo</button>
+    {photo.ai_correction?.correction_note && <div className="technician-correction-note"><strong>Technician correction:</strong> {photo.ai_correction.correction_note}</div>}
+    <div className="ai-correction-actions"><button type="button" className="secondary-button ai-apply" onClick={onApply}>Apply analysis to photo</button><button type="button" className="text-button" onClick={()=>setEditing(v=>!v)}>✎ Correct AI analysis</button></div>
+    {editing && correction && <div className="ai-correction-form">
+      <div className="section-header"><div><p className="eyebrow">Technician override</p><h3>Correct the analysis</h3></div></div>
+      <div className="form-grid"><label>Finding / title<input value={correction.title} onChange={e=>setCorrection({...correction,title:e.target.value})}/></label><label>Severity<select value={correction.severity} onChange={e=>setCorrection({...correction,severity:e.target.value})}>{['Low','Moderate','High','Critical','Unknown'].map(x=><option key={x}>{x}</option>)}</select></label><label>Area / component<input value={correction.component} onChange={e=>setCorrection({...correction,component:e.target.value})}/></label><label>Surface<select value={correction.surface} onChange={e=>setCorrection({...correction,surface:e.target.value})}>{['Interior','Exterior','Unknown'].map(x=><option key={x}>{x}</option>)}</select></label><label className="full-width">Coating condition<input value={correction.coating_condition} onChange={e=>setCorrection({...correction,coating_condition:e.target.value})}/></label><label className="full-width">Defects (comma separated)<input value={correction.defects} onChange={e=>setCorrection({...correction,defects:e.target.value})}/></label><label className="full-width">Corrected summary<textarea rows="3" value={correction.summary} onChange={e=>setCorrection({...correction,summary:e.target.value})}/></label><label className="full-width">What did the AI get wrong?<textarea rows="2" placeholder="Example: Brown areas are active rust at coating holidays, not staining." value={correction.correction_note} onChange={e=>setCorrection({...correction,correction_note:e.target.value})}/></label></div>
+      <div className="ai-correction-buttons"><button type="button" className="secondary-button" onClick={()=>saveCorrection(false)}>Save technician correction</button><button type="button" className="primary-button" onClick={()=>saveCorrection(true)}>Correct + re-analyze</button></div>
+    </div>}
   </div>
 }
-
 export default function InspectionForm({ asset, assets, knowledge, onCancel, onSave }) {
   const [selectedId, setSelectedId] = useState(asset?.id || assets[0]?.id || '')
   const current = assets.find((item) => item.id === selectedId) || asset
@@ -104,21 +130,28 @@ export default function InspectionForm({ asset, assets, knowledge, onCancel, onS
     const next = Array.from(event.target.files || []).map((file) => ({
       id: randomId(), file, url: URL.createObjectURL(file),
       title: file.name.replace(/\.[^/.]+$/, ''), category: 'Interior', notes: '', annotation_note: '',
-      ai_analysis: null, ai_busy: false, ai_error: '', ai_applied: false,
+      ai_analysis: null, ai_original_analysis: null, ai_correction: null, ai_corrected: false, ai_busy: false, ai_error: '', ai_applied: false,
     }))
     setPhotos((items) => [...items, ...next]); event.target.value = ''
   }
   const updatePhoto = (id, patch) => setPhotos((items) => items.map((item) => item.id === id ? { ...item, ...patch } : item))
   const removePhoto = (id) => setPhotos((items) => { const target = items.find((item) => item.id === id); if (target) URL.revokeObjectURL(target.url); return items.filter((item) => item.id !== id) })
 
-  const analyzePhoto = async (photo) => {
+  const analyzePhoto = async (photo, correction = null) => {
     updatePhoto(photo.id, { ai_busy: true, ai_error: '' })
     try {
-      const analysis = await analyzeInspectionPhoto(photo, current, knowledge)
-      updatePhoto(photo.id, { ai_analysis: analysis, ai_busy: false })
+      const original = photo.ai_original_analysis || photo.ai_analysis || null
+      const analysis = await analyzeInspectionPhoto(photo, current, knowledge, correction)
+      updatePhoto(photo.id, { ai_analysis: analysis, ai_original_analysis: original, ai_correction: correction || photo.ai_correction || null, ai_corrected: Boolean(correction || photo.ai_corrected), ai_busy: false, ai_applied: false })
     } catch (e) {
       updatePhoto(photo.id, { ai_busy: false, ai_error: e.message || 'AI analysis failed.' })
     }
+  }
+
+  const correctAI = (photo, correction) => {
+    const original = photo.ai_original_analysis || photo.ai_analysis
+    const correctedAnalysis = { ...photo.ai_analysis, ...correction, confidence: photo.ai_analysis?.confidence ?? 0 }
+    updatePhoto(photo.id, { ai_original_analysis: original, ai_analysis: correctedAnalysis, ai_correction: correction, ai_corrected: true, ai_applied: false })
   }
 
   const applyAI = (photo) => {
@@ -153,7 +186,7 @@ export default function InspectionForm({ asset, assets, knowledge, onCancel, onS
         {!photos.length ? <div className="empty-state"><strong>No photos added</strong><p>Add field photos to create a defensible asset history and optionally run AI-assisted analysis.</p></div> : <div className="inspection-photo-grid">{photos.map((photo) => <article className="inspection-photo-card" key={photo.id}>
           <img src={photo.url} alt=""/>
           <div className="photo-ai-actions"><button type="button" className="ai-analyze-button" disabled={photo.ai_busy} onClick={() => analyzePhoto(photo)}>{photo.ai_busy ? 'Analyzing…' : photo.ai_analysis ? '↻ Analyze again' : '✦ Analyze with AI'}</button>{photo.ai_applied && <span className="reviewed-badge">Inspector applied</span>}</div>
-          <AIResult photo={photo} knowledge={knowledge} onApply={() => applyAI(photo)}/>
+          <AIResult photo={photo} knowledge={knowledge} onApply={() => applyAI(photo)} onCorrect={(correction) => correctAI(photo, correction)} onReanalyze={(correction) => analyzePhoto(photo, correction)}/>
           <label>Title<input value={photo.title} onChange={(e) => updatePhoto(photo.id, { title: e.target.value, ai_applied: false })}/></label>
           <label>Category<select value={photo.category} onChange={(e) => updatePhoto(photo.id, { category: e.target.value })}><option>Interior</option><option>Exterior</option><option>Identification</option><option>Defect</option><option>Component</option><option>Before Repair</option><option>During Repair</option><option>After Repair</option><option>Final Acceptance</option></select></label>
           <DictationTextarea label="Photo notes" rows={3} value={photo.notes} onChange={(notes) => updatePhoto(photo.id, { notes, ai_applied: false })}/>

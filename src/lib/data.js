@@ -373,7 +373,7 @@ export async function createInspection({ organizationId, userId, asset, form, ph
 
   for (const item of photos) {
     const storagePath = await uploadImage(item.file, organizationId, `inspections/${inspection.id}`)
-    const { error: photoError } = await supabase.from('inspection_photos').insert({
+    const photoPayload = {
       organization_id: organizationId,
       inspection_id: inspection.id,
       asset_id: asset.id,
@@ -383,7 +383,17 @@ export async function createInspection({ organizationId, userId, asset, form, ph
       category: item.category,
       notes: item.notes.trim() || null,
       annotation_note: item.annotation_note.trim() || null,
-    })
+      ai_analysis: item.ai_analysis || null,
+      ai_original_analysis: item.ai_original_analysis || null,
+      ai_correction: item.ai_correction || null,
+      ai_corrected: Boolean(item.ai_corrected),
+    }
+    let { error: photoError } = await supabase.from('inspection_photos').insert(photoPayload)
+    if (photoError && (photoError.code === '42703' || /ai_(analysis|original_analysis|correction|corrected)/i.test(photoError.message || ''))) {
+      const legacyPayload = { ...photoPayload }
+      delete legacyPayload.ai_analysis; delete legacyPayload.ai_original_analysis; delete legacyPayload.ai_correction; delete legacyPayload.ai_corrected
+      ;({ error: photoError } = await supabase.from('inspection_photos').insert(legacyPayload))
+    }
     if (photoError) throw photoError
   }
 
@@ -603,5 +613,13 @@ export async function restoreAssetComponent(componentId) {
     updated_at: new Date().toISOString(),
   }).eq('id', componentId).select('*').single()
   if (error) throw error
+  return data
+}
+
+export async function fetchQRAssetPassport(assetId) {
+  if (!assetId) throw new Error('Missing QR asset reference.')
+  const { data, error } = await supabase.rpc('get_qr_asset_passport', { target_asset: assetId })
+  if (error) throw error
+  if (!data?.asset) throw new Error('This QR asset could not be found or is no longer available.')
   return data
 }
