@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { analyzeAssetNameplate } from '../lib/ai'
+import { saveCapturedPhotoToDevice } from '../lib/devicePhotos'
 
 const blank = { asset_tag: '', name: '', asset_type: 'Tank / Vessel', site_id: '', facility: '', location: '', contents: '', manufacturer: '', model: '', serial_number: '', install_date: '', next_inspection_date: '', notes: '' }
 
@@ -12,7 +14,10 @@ export default function AddAssetForm({ onCancel, onSave, initialValues = null, m
   const [file, setFile] = useState(null)
   const [preview, setPreview] = useState(currentCoverUrl || null)
   const [busy, setBusy] = useState(false)
+  const [readingNameplate, setReadingNameplate] = useState(false)
+  const [nameplateResult, setNameplateResult] = useState(null)
   const [error, setError] = useState('')
+  const nameplateInputRef = useRef(null)
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }))
 
   useEffect(() => {
@@ -37,7 +42,26 @@ export default function AddAssetForm({ onCancel, onSave, initialValues = null, m
     })
   }
 
+  const readNameplate = async (event) => {
+    const nameplateFile = event.target.files?.[0]
+    event.target.value = ''
+    if (!nameplateFile) return
+    saveCapturedPhotoToDevice(nameplateFile, 'polyshield-nameplate')
+    setReadingNameplate(true); setError('')
+    try {
+      const result = await analyzeAssetNameplate(nameplateFile)
+      setNameplateResult(result)
+      setForm((current) => {
+        const specifications = [result.capacity&&`Capacity: ${result.capacity}`,result.design_pressure&&`Design pressure: ${result.design_pressure}`,result.design_temperature&&`Design temperature: ${result.design_temperature}`,result.material&&`Material: ${result.material}`,result.notes].filter(Boolean).join(' · ')
+        return {...current,asset_tag:current.asset_tag||result.asset_tag||'',name:current.name||result.name||'',asset_type:result.asset_type||current.asset_type,manufacturer:current.manufacturer||result.manufacturer||'',model:current.model||result.model||'',serial_number:current.serial_number||result.serial_number||'',install_date:current.install_date||result.install_date||'',notes:[current.notes,specifications].filter(Boolean).join('\n')}
+      })
+    } catch (e) { setError(e.message || 'Could not read this nameplate. Retake it square-on with better light.') }
+    finally { setReadingNameplate(false) }
+  }
+
   return <div className="page-stack"><button className="back-button" onClick={onCancel}>← Back</button><div className="page-heading"><div><p className="eyebrow">{editing ? 'Digital asset passport' : 'New digital passport'}</p><h1>{editing ? 'Edit asset' : 'Add asset'}</h1><p>{editing ? 'Update the equipment record without changing inspection history or calculated health.' : 'Create the permanent record and start with a real cover photo.'}</p></div></div><form className="panel form-grid" onSubmit={submit}>
+    <div className="nameplate-reader full-width"><div><strong>📷 Read vessel nameplate</strong><p className="muted">Photograph the data tag and AI will draft the visible manufacturer, model, serial number, asset tag, date, and ratings for your review.</p></div><button type="button" className="primary-button" disabled={readingNameplate||busy} onClick={()=>nameplateInputRef.current?.click()}>{readingNameplate?'Reading nameplate…':'Scan nameplate'}</button><input ref={nameplateInputRef} className="visually-hidden-file" type="file" accept="image/*" capture="environment" onChange={readNameplate}/></div>
+    {nameplateResult&&<div className="info-message full-width"><strong>Nameplate draft applied · {nameplateResult.confidence}% confidence</strong><span>Review every field before creating the asset.{nameplateResult.visible_text?.length?` Text read: ${nameplateResult.visible_text.join(' · ')}`:''}</span></div>}
     <label>Asset tag *<input required value={form.asset_tag} onChange={(e) => set('asset_tag', e.target.value)} placeholder="PS-1001" /></label><label>Asset name *<input required value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="North Process Tank" /></label>
     <label>Asset type<select value={form.asset_type} onChange={(e) => set('asset_type', e.target.value)}><option>Tank / Vessel</option><option>Piping</option><option>Scrubber</option><option>Containment</option><option>Process Equipment</option><option>Other</option></select></label><label>Contents<input value={form.contents} onChange={(e) => set('contents', e.target.value)} placeholder="Water, acid, fuel…" /></label>
     <label>Site / Facility<select value={form.site_id || ''} onChange={(e) => { const site = sites.find(s => s.id === e.target.value); setForm(current => ({ ...current, site_id:e.target.value, facility:site?.name || current.facility })) }}><option value="">Legacy / unassigned</option>{sites.map(site => <option key={site.id} value={site.id}>{site.name}</option>)}</select></label><label>Location<input value={form.location} onChange={(e) => set('location', e.target.value)} placeholder="Building / area / coordinates" /></label>

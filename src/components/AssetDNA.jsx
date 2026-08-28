@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { formatDate } from '../lib/data'
+import { saveCapturedPhotoToDevice } from '../lib/devicePhotos'
 
 const statusOptions = ['Documented','Inspector Confirmed','Customer Reported','AI Inferred','Unknown']
 const emptyDNA = {
@@ -25,7 +26,7 @@ export default function AssetDNA({ asset, dna, events = [], photos = [], onSaveD
   const add=async()=>{setBusy(true);setError('');try{const saved=await onAddEvent(event,eventPhotos);setEvent({...emptyEvent,event_date:new Date().toISOString().slice(0,10)});setEventPhotos([]);setAdding(false);if(saved?.photoFailures)setError(`Service event saved, but ${saved.photoFailures} photo${saved.photoFailures===1?'':'s'} could not upload.`)}catch(e){setError(e.message||'Could not save service event.')}finally{setBusy(false)}}
   const latestBaseline=events.find(x=>x.establishes_baseline)
   const toggleServiceEvent=()=>{setError('');setEditing(false);setAdding(v=>{if(v)setEventPhotos([]);return !v})}
-  const addEventPhotos=(files)=>{const incoming=Array.from(files||[]).filter(file=>file.type?.startsWith('image/'));setEventPhotos(current=>[...current,...incoming].slice(0,12))}
+  const addEventPhotos=(files)=>{const incoming=Array.from(files||[]).filter(file=>file.type?.startsWith('image/'));if(files===cameraInputRef.current?.files)incoming.forEach(file=>saveCapturedPhotoToDevice(file,'polyshield-service'));setEventPhotos(current=>[...current,...incoming].slice(0,12))}
   const removeEventPhoto=(index)=>setEventPhotos(current=>current.filter((_,i)=>i!==index))
   const photosForEvent=(eventId)=>photos.filter(photo=>(photo.caption||'').startsWith(`[service-event:${eventId}]`))
   const toggleEditing=()=>{setError('');setAdding(false);setEditing(v=>!v)}

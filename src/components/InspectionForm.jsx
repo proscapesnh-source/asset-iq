@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { aiAnnotationLine, aiNotesDraft, analyzeInspectionPhoto } from '../lib/ai'
 import { randomId } from '../lib/id'
+import { saveCapturedPhotoToDevice } from '../lib/devicePhotos'
 
 function DictationTextarea({ label, value, onChange, rows = 3, placeholder = '' }) {
   const [listening, setListening] = useState(false)
@@ -127,7 +128,9 @@ export default function InspectionForm({ asset, assets, knowledge, onCancel, onS
   useEffect(() => { if (draftKey) localStorage.setItem(draftKey, JSON.stringify(form)) }, [draftKey, form])
 
   const addPhotos = (event) => {
-    const next = Array.from(event.target.files || []).map((file) => ({
+    const files = Array.from(event.target.files || [])
+    if (event.target === cameraInputRef.current) files.forEach((file) => saveCapturedPhotoToDevice(file, 'polyshield-inspection'))
+    const next = files.map((file) => ({
       id: randomId(), file, url: URL.createObjectURL(file),
       title: file.name.replace(/\.[^/.]+$/, ''), category: 'Interior', notes: '', annotation_note: '',
       ai_analysis: null, ai_original_analysis: null, ai_correction: null, ai_corrected: false, ai_busy: false, ai_error: '', ai_applied: false,

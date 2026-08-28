@@ -68,6 +68,39 @@ function cleanComponentAnalysis(value = {}) {
   }
 }
 
+function cleanAssetNameplate(value = {}) {
+  const rawConfidence = Number(value.confidence) || 0
+  return {
+    asset_tag: String(value.asset_tag || '').slice(0,100),
+    name: String(value.name || '').slice(0,140),
+    asset_type: String(value.asset_type || 'Tank / Vessel').slice(0,100),
+    manufacturer: String(value.manufacturer || '').slice(0,120),
+    model: String(value.model || '').slice(0,120),
+    serial_number: String(value.serial_number || '').slice(0,120),
+    install_date: /^\d{4}-\d{2}-\d{2}$/.test(value.install_date || '') ? value.install_date : '',
+    capacity: String(value.capacity || '').slice(0,120),
+    design_pressure: String(value.design_pressure || '').slice(0,120),
+    design_temperature: String(value.design_temperature || '').slice(0,120),
+    material: String(value.material || '').slice(0,120),
+    visible_text: Array.isArray(value.visible_text) ? value.visible_text.filter(Boolean).slice(0,16).map(String) : [],
+    confidence: Math.round(Math.max(0,Math.min(100,rawConfidence > 0 && rawConfidence <= 1 ? rawConfidence * 100 : rawConfidence))),
+    notes: String(value.notes || '').slice(0,900),
+  }
+}
+
+async function analyzeAssetNameplatePayload(imageDataUrl, env) {
+  const prompt = `You are the asset-nameplate reader inside PolyShield Asset IQ. Read only information visibly supported by this industrial tank or vessel nameplate/data tag. Never guess obscured values. Return empty strings for fields that are not legible. Normalize a fully visible date to YYYY-MM-DD only when unambiguous. Create a short practical asset name only when the equipment type or service is visible. Put ratings not represented by a field into notes. Return ONLY JSON: {"asset_tag":"","name":"","asset_type":"Tank / Vessel","manufacturer":"","model":"","serial_number":"","install_date":"","capacity":"","design_pressure":"","design_temperature":"","material":"","visible_text":[],"confidence":0,"notes":""}`
+  const model = env.OPENAI_VISION_MODEL || 'gpt-5.6-luna'
+  const response = await fetch('https://api.openai.com/v1/responses', {method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model,input:[{role:'user',content:[{type:'input_text',text:prompt},{type:'input_image',image_url:imageDataUrl}]}],text:{format:{type:'json_object'}},max_output_tokens:900})})
+  const responseJson = await response.json().catch(()=>({}))
+  if (!response.ok) { const error = new Error(responseJson?.error?.message || `AI service returned ${response.status}.`); error.statusCode=response.status; throw error }
+  const raw = collectOutputText(responseJson)
+  if (!raw) throw new Error('AI service returned an empty nameplate reading.')
+  let parsed
+  try { parsed=JSON.parse(raw) } catch { const match=raw.match(/\{[\s\S]*\}/); if(!match)throw new Error('AI service returned unreadable nameplate data.'); parsed=JSON.parse(match[0]) }
+  return cleanAssetNameplate(parsed)
+}
+
 async function analyzeComponentPayload(payload, imageDataUrl, env) {
   const a = payload?.asset || {}
   const prompt = `You are the component-registration assistant inside PolyShield Asset IQ.
@@ -145,6 +178,7 @@ export async function analyzePhotoPayload(payload, env = process.env) {
   }
 
   if (payload?.mode === 'component') return analyzeComponentPayload(payload, imageDataUrl, env)
+  if (payload?.mode === 'asset-nameplate') return analyzeAssetNameplatePayload(imageDataUrl, env)
 
   const assetContext = payload?.asset || {}
   const knowledge = payload?.knowledge || {}

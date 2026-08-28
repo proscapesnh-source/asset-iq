@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import StatusBadge from './StatusBadge'
 import { analyzeComponentPhoto } from '../lib/ai'
+import { saveCapturedPhotoToDevice } from '../lib/devicePhotos'
 
 const blank={component_tag:'',name:'',component_type:'Other',location:'',manufacturer:'',model:'',serial_number:'',condition:'Unknown',notes:'',ai_confidence:null,ai_identified:false,ai_visible_text:[]}
 const types=['Valve','Pump','Nozzle','Manway','Hatch','Agitator / Mixer','Level Sensor','Temperature Sensor','Pressure Gauge','Anode','Ladder','Platform','Vent','Drain','Heat Exchanger','Piping','Other']
@@ -31,7 +32,7 @@ export default function AssetComponents({asset,components=[],ready=true,onCreate
     {error&&<div className="error-message">{error}</div>}
     {open&&<div className="component-editor" id="component-editor">
       <div className="photo-first-header"><div><p className="eyebrow">Step 1 · Photo first</p><h3>{editing?'Re-scan or edit component':'Photograph the component'}</h3><p className="muted">Try to include the full component and its nameplate/tag in the photo.</p></div>{form.ai_identified&&<div className="ai-confidence">AI {form.ai_confidence??0}%</div>}</div>
-      <input ref={cameraRef} hidden type="file" accept="image/*" capture="environment" onChange={e=>identify(e.target.files?.[0])}/>
+      <input ref={cameraRef} hidden type="file" accept="image/*" capture="environment" onChange={e=>{const file=e.target.files?.[0];if(file)saveCapturedPhotoToDevice(file,'polyshield-component');identify(file);e.target.value=''}}/>
       <input ref={libraryRef} hidden type="file" accept="image/*" onChange={e=>identify(e.target.files?.[0])}/>
       <div className="component-photo-actions"><button className="primary-button" disabled={analyzing} onClick={()=>cameraRef.current?.click()}>📷 Take photo</button><button className="secondary-button" disabled={analyzing} onClick={()=>libraryRef.current?.click()}>▣ Photo library</button></div>
       {photoPreview&&<div className="component-ai-photo"><img src={photoPreview} alt="Component"/></div>}

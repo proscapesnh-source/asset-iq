@@ -82,3 +82,15 @@ export async function analyzeComponentPhoto(file, asset) {
   if (!response.ok) throw new Error(body.error || 'AI component identification failed.')
   return body.analysis
 }
+
+export async function analyzeAssetNameplate(file) {
+  const imageDataUrl = await fileToCompressedDataUrl(file, 2000, 0.88)
+  const response = await fetch('/api/analyze-photo', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ mode:'asset-nameplate', imageDataUrl }),
+  })
+  const body = await response.json().catch(()=>({}))
+  if (!response.ok) throw new Error(body.error || 'AI could not read this nameplate.')
+  return body.analysis
+}

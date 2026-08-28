@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import InstallApp from './InstallApp'
+import PhotoSaveViewer from './PhotoSaveViewer'
 
 export default function AppShell({ organizationName, userEmail, role, active, onNavigate, onSignOut, children }) {
   const [online, setOnline] = useState(navigator.onLine)
@@ -54,6 +55,7 @@ export default function AppShell({ organizationName, userEmail, role, active, on
           {items.map(([id, icon, label]) => <button key={id} className={active === id ? 'active' : ''} onClick={() => onNavigate(id)}><span>{icon}</span><small>{label}</small></button>)}
         </nav>
       </div>
+      <PhotoSaveViewer />
     </div>
   )
 }
