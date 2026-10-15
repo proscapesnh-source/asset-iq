@@ -1,3 +1,17 @@
+// Rank field-verified examples by this vessel's context rather than blindly using the newest cases.
+function relevantCorrections(cases, asset, category) {
+  const terms = [asset?.asset_type, asset?.contents, asset?.name, category].filter(Boolean).join(' ').toLowerCase().split(/[^a-z0-9]+/).filter(word => word.length > 3)
+  return [...cases].map((entry, index) => {
+    const evidence = [entry.corrected_analysis?.component, entry.corrected_analysis?.surface, entry.corrected_analysis?.defects?.join(' '), entry.correction_note].filter(Boolean).join(' ').toLowerCase()
+    const score = terms.reduce((total, term) => total + (evidence.includes(term) ? 1 : 0), 0)
+    return { entry, score, index }
+  }).sort((a, b) => b.score - a.score || a.index - b.index).slice(0, 12).map(({ entry }) => ({
+    original: entry.original_analysis,
+    corrected: entry.corrected_analysis,
+    correction_note: entry.correction_note,
+  }))
+}
+
 function fileToCompressedDataUrl(file, maxDimension = 1600, quality = 0.8) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -46,7 +60,7 @@ export async function analyzeInspectionPhoto(photo, asset, knowledge = {}, inspe
         failures: (knowledge.failures || []).slice(0, 45).map((x) => ({ name:x.name, category:x.category, visual_indicators:x.visual_indicators, severity_guidance:x.severity_guidance, verification:x.verification })),
         repairs: (knowledge.repairs || []).slice(0, 15).map((x) => ({ name:x.name, compatible_families:x.compatible_families, surface_prep:x.surface_prep, procedure:x.procedure, qa_qc:x.qa_qc, limitations:x.limitations })),
         standards: (knowledge.standards || []).slice(0, 20).map((x) => ({ name:x.name, source:x.source, version:x.version, scope:x.scope, guidance:x.guidance })),
-        verified_corrections: (knowledge.verifiedCorrections || []).slice(0, 12).map((x) => ({ original:x.original_analysis, corrected:x.corrected_analysis, correction_note:x.correction_note })),
+        verified_corrections: relevantCorrections(knowledge.verifiedCorrections || [], asset, photo.category),
       },
     }),
   })
