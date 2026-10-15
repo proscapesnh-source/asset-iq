@@ -506,7 +506,7 @@ export async function fetchKnowledgeBase(organizationId) {
     return [key, data || []]
   }))
   const knowledge = Object.fromEntries(entries)
-  const { data: verifiedCorrections, error } = await supabase.from('ai_inspection_feedback').select('original_analysis, corrected_analysis, correction_note, created_at').eq('organization_id', organizationId).eq('status', 'approved').order('created_at', { ascending: false }).limit(30)
+  const { data: verifiedCorrections, error } = await supabase.from('ai_inspection_feedback').select('asset_id, original_analysis, corrected_analysis, correction_note, created_at').eq('organization_id', organizationId).eq('status', 'approved').order('created_at', { ascending: false }).limit(100)
   if (error && error.code !== '42P01' && error.code !== '42501') console.warn('Verified corrections unavailable:', error.message)
   knowledge.verifiedCorrections = error ? [] : (verifiedCorrections || [])
   return knowledge
