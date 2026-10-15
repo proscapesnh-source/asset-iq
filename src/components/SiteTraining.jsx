@@ -55,6 +55,19 @@ export default function SiteTraining({ sites = [], organizationId, userId, role 
     } catch (e) { setError(e.message) } finally { setBusy(false) }
   }
 
+  async function toggleNetwork(module) {
+    if (!canManage || module.organization_id !== organizationId) return
+    setBusy(true); setError(''); setMessage('')
+    try {
+      const { error: updateError } = await supabase.from('site_training_modules')
+        .update({ shared_network: !module.shared_network })
+        .eq('id', module.id).eq('organization_id', organizationId)
+      if (updateError) throw updateError
+      setMessage(module.shared_network ? 'Training is now private to your organization.' : 'Training is now available across the enrolled technician network.')
+      setRevision(n => n + 1)
+    } catch(e) { setError(e.message) } finally { setBusy(false) }
+  }
+
   const visible = modules.filter(m => (!siteId || m.site_id === siteId) && (showNetwork || m.organization_id === organizationId))
   const siteName = m => m.site_name || sites.find(s => s.id === m.site_id)?.name || 'Enrolled site'
   const completedByMe = m => completed.some(a => a.module_id === m.id && a.module_version === m.version)
@@ -84,7 +97,7 @@ export default function SiteTraining({ sites = [], organizationId, userId, role 
         {module.document_url && <p><a href={module.document_url} target="_blank" rel="noopener noreferrer">Open training resource</a></p>}
         <p>{completedByMe(module) ? '✓ You acknowledged this version' : 'Not yet acknowledged'}</p>
         <button className="secondary-button" disabled={busy || completedByMe(module)} onClick={() => acknowledge(module)}>Acknowledge training</button>
-        {canManage && module.organization_id === organizationId && <p className="muted">{module.shared_network ? 'Shared with the enrolled technician network' : 'Visible to this organization only'}</p>}
+        {canManage && module.organization_id === organizationId && <button className="secondary-button" disabled={busy} onClick={() => toggleNetwork(module)}>{module.shared_network ? 'Stop sharing across sites' : 'Share with all enrolled technicians'}</button>}
       </div></article>)}</div>}
     </section>
   </div>
