@@ -126,7 +126,7 @@ export default function SiteTraining({ sites = [], organizationId, userId, role 
 
   const visible = modules.filter(m => (!siteId || m.site_id === siteId) && (showNetwork || m.organization_id === organizationId))
   const siteName = m => m.site_name || sites.find(s => s.id === m.site_id)?.name || 'Enrolled site'
-  const completedByMe = m => completed.some(a => a.module_id === m.id && a.module_version === m.version)
+  const completedByMe = m => completed.some(a => a.module_id === m.id && a.user_id === userId && a.module_version === m.version)
   const remaining = visible.filter(m => m.required && !completedByMe(m)).length
 
   return <div className="page-stack">
