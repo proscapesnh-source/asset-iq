@@ -67,6 +67,7 @@ export async function loadContext() {
     .from('organization_members')
     .select('organization_id, role, organizations(name, report_display_name, logo_storage_path)')
     .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
     .limit(1)
     .single()
   if (error) throw error
