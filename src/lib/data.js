@@ -532,7 +532,13 @@ export async function seedKnowledgeBase(organizationId, starter) {
   for (const [library, rows] of Object.entries(starter || {})) {
     const table = KNOWLEDGE_TABLES[library]
     if (!table || !rows?.length) continue
-    const { error } = await supabase.from(table).insert(rows.map((row) => ({ organization_id: organizationId, ...row })))
+    const identity = library === 'coatings' ? 'product_name' : 'name'
+    const { data: existing, error: lookupError } = await supabase.from(table).select(identity).eq('organization_id', organizationId)
+    if (lookupError) throw lookupError
+    const known = new Set((existing || []).map((row) => String(row[identity] || '').trim().toLowerCase()))
+    const additions = rows.filter((row) => !known.has(String(row[identity] || '').trim().toLowerCase()))
+    if (!additions.length) continue
+    const { error } = await supabase.from(table).insert(additions.map((row) => ({ organization_id: organizationId, ...row })))
     if (error) throw error
   }
 }
