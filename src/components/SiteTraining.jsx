@@ -9,6 +9,8 @@ export default function SiteTraining({ sites = [], organizationId, userId, role 
   const [modules, setModules] = useState([])
   const [completed, setCompleted] = useState([])
   const [form, setForm] = useState(empty)
+  const [trainingPhoto, setTrainingPhoto] = useState(null)
+  const [photoLinks, setPhotoLinks] = useState({})
   const [showNetwork, setShowNetwork] = useState(true)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -24,7 +26,14 @@ export default function SiteTraining({ sites = [], organizationId, userId, role 
       const { data: acknowledgments, error: ackError } = await supabase.from('site_training_acknowledgments')
         .select('module_id,user_id,module_version,acknowledged_at').eq('organization_id', organizationId)
       if (ackError) throw ackError
-      if (active) { setModules(data || []); setCompleted(acknowledgments || []); setError('') }
+      if (active) {
+        setModules(data || []); setCompleted(acknowledgments || []); setError('')
+        const links = await Promise.all((data || []).filter(m => m.photo_path).map(async m => {
+          const { data: signed, error: signError } = await supabase.storage.from('site-training').createSignedUrl(m.photo_path, 3600)
+          return [m.id, signError ? null : signed?.signedUrl]
+        }))
+        if (active) setPhotoLinks(Object.fromEntries(links))
+      }
     }
     load().catch(e => { if (active) setError(e.message || 'Unable to load site training.') })
     return () => { active = false }
@@ -36,12 +45,22 @@ export default function SiteTraining({ sites = [], organizationId, userId, role 
     try {
       if (!form.site_id || !form.title.trim() || !form.instructions.trim()) throw new Error('Site, title and training instructions are required.')
       if (form.document_url && !/^https:\/\//i.test(form.document_url.trim())) throw new Error('Resource link must use HTTPS.')
-      const { error: saveError } = await supabase.from('site_training_modules').insert({
+      if (trainingPhoto && (!['image/jpeg','image/png','image/webp'].includes(trainingPhoto.type) || trainingPhoto.size > 10 * 1024 * 1024)) throw new Error('Choose a JPEG, PNG or WebP image smaller than 10 MB.')
+      const { data: saved, error: saveError } = await supabase.from('site_training_modules').insert({
         organization_id: organizationId, site_id: form.site_id, title: form.title.trim(),
         instructions: form.instructions.trim(), document_url: form.document_url.trim() || null,
         required: form.required, shared_network:form.shared_network, created_by: userId
-      })
+      }).select('id').single()
       if (saveError) throw saveError
+      if (trainingPhoto) {
+        const extension = trainingPhoto.type === 'image/png' ? 'png' : trainingPhoto.type === 'image/webp' ? 'webp' : 'jpg'
+        const storagePath = organizationId + '/' + saved.id + '/training-' + crypto.randomUUID() + '.' + extension
+        const { error: uploadError } = await supabase.storage.from('site-training').upload(storagePath, trainingPhoto, { contentType: trainingPhoto.type, upsert: false })
+        if (uploadError) throw new Error('Training created but image upload failed: ' + uploadError.message)
+        const { error: linkError } = await supabase.from('site_training_modules').update({ photo_path: storagePath }).eq('id', saved.id).eq('organization_id', organizationId)
+        if (linkError) throw new Error('Training created but image could not be linked: ' + linkError.message)
+      }
+      setTrainingPhoto(null)
       setForm(empty); setMessage('Site training published.'); setRevision(n => n + 1)
     } catch (e) { setError(e.message) } finally { setBusy(false) }
   }
@@ -85,6 +104,7 @@ export default function SiteTraining({ sites = [], organizationId, userId, role 
       <label>Site<select required value={form.site_id} onChange={e => setForm({ ...form, site_id: e.target.value })}><option value="">Select site</option>{sites.map(s => <option value={s.id} key={s.id}>{s.name}</option>)}</select></label>
       <label>Training title<input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Site orientation / fall protection / confined space" /></label>
       <label>Safety training content<textarea rows="6" required value={form.instructions} onChange={e => setForm({ ...form, instructions: e.target.value })} placeholder="Site hazards, PPE, emergency procedures, isolation requirements, contacts and required training instructions" /></label>
+      <label>Photo of existing training sheet or safety notice (optional)<input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => setTrainingPhoto(e.target.files?.[0] || null)} /></label>
       <label>Approved document or video link (optional)<input type="url" value={form.document_url} onChange={e => setForm({ ...form, document_url: e.target.value })} placeholder="https://..." /></label>
       <label><input type="checkbox" checked={form.required} onChange={e => setForm({ ...form, required: e.target.checked })} /> Required training</label>
       <label><input type="checkbox" checked={form.shared_network} onChange={e => setForm({ ...form, shared_network: e.target.checked })} /> Publish to all enrolled PolyShield technicians, regardless of their site or organization</label>
@@ -95,6 +115,7 @@ export default function SiteTraining({ sites = [], organizationId, userId, role 
       <div className="activity-list">{visible.map(module => <article key={module.id}><div>
         <strong>{module.title}</strong><p className="muted">{siteName(module)} · Version {module.version} · {module.required ? 'Required' : 'Optional'}</p>
         <p style={{whiteSpace:'pre-wrap'}}>{module.instructions}</p>
+        {module.photo_path && (photoLinks[module.id] ? <p><a href={photoLinks[module.id]} target="_blank" rel="noopener noreferrer"><img src={photoLinks[module.id]} alt={'Site training document: ' + module.title} style={{ maxWidth: '100%', maxHeight: 360, objectFit: 'contain' }} /></a></p> : <p className="muted">Training photo unavailable. Refresh the page or contact the site supervisor.</p>)}
         {module.document_url && <p><a href={module.document_url} target="_blank" rel="noopener noreferrer">Open training resource</a></p>}
         <p>{completedByMe(module) ? '✓ You acknowledged this version' : 'Not yet acknowledged'}</p>
         <button className="secondary-button" disabled={busy || completedByMe(module)} onClick={() => acknowledge(module)}>Acknowledge training</button>
