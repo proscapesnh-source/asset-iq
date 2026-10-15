@@ -90,7 +90,7 @@ function cleanAssetNameplate(value = {}) {
 
 async function analyzeAssetNameplatePayload(imageDataUrl, env) {
   const prompt = `You are the asset-nameplate reader inside PolyShield Asset IQ. Read only information visibly supported by this industrial tank or vessel nameplate/data tag. Never guess obscured values. Return empty strings for fields that are not legible. Normalize a fully visible date to YYYY-MM-DD only when unambiguous. Create a short practical asset name only when the equipment type or service is visible. Put ratings not represented by a field into notes. Return ONLY JSON: {"asset_tag":"","name":"","asset_type":"Tank / Vessel","manufacturer":"","model":"","serial_number":"","install_date":"","capacity":"","design_pressure":"","design_temperature":"","material":"","visible_text":[],"confidence":0,"notes":""}`
-  const model = env.OPENAI_VISION_MODEL || 'gpt-5.6-luna'
+  const model = env.OPENAI_VISION_MODEL || 'gpt-4o'
   const response = await fetch('https://api.openai.com/v1/responses', {method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model,input:[{role:'user',content:[{type:'input_text',text:prompt},{type:'input_image',image_url:imageDataUrl}]}],text:{format:{type:'json_object'}},max_output_tokens:900})})
   const responseJson = await response.json().catch(()=>({}))
   if (!response.ok) { const error = new Error(responseJson?.error?.message || `AI service returned ${response.status}.`); error.statusCode=response.status; throw error }
@@ -128,7 +128,7 @@ Rules:
 Return ONLY JSON:
 {"name":"","component_type":"Other","component_tag":"","manufacturer":"","model":"","serial_number":"","location":"","condition":"Unknown","confidence":0,"visible_text":[],"observed":"","notes":"","limitations":""}`
 
-  const model = env.OPENAI_VISION_MODEL || 'gpt-5.6-luna'
+  const model = env.OPENAI_VISION_MODEL || 'gpt-4o'
   const response = await fetch('https://api.openai.com/v1/responses', {
     method:'POST',
     headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},
@@ -262,7 +262,7 @@ Return JSON with exactly these keys:
   "compliance_concerns": [{"concern":"potential concern, not a violation declaration","reference":"Knowledge Center standard/source","confidence":0,"verification":"what must be confirmed"}]
 }`
 
-  const model = env.OPENAI_VISION_MODEL || 'gpt-5.6-luna'
+  const model = env.OPENAI_VISION_MODEL || 'gpt-4o'
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: {
