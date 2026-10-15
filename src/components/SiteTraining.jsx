@@ -1,3 +1,4 @@
+import SitePersonnel from './SitePersonnel'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
@@ -100,5 +101,6 @@ export default function SiteTraining({ sites = [], organizationId, userId, role 
         {canManage && module.organization_id === organizationId && <button className="secondary-button" disabled={busy} onClick={() => toggleNetwork(module)}>{module.shared_network ? 'Stop sharing across sites' : 'Share with all enrolled technicians'}</button>}
       </div></article>)}</div>}
     </section>
+    <SitePersonnel organizationId={organizationId} sites={sites} modules={modules} role={role} userId={userId} />
   </div>
 }
