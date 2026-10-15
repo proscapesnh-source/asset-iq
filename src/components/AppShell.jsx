@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import InstallApp from './InstallApp'
 import PhotoSaveViewer from './PhotoSaveViewer'
+import { allowedViews, workspaceLabel } from '../lib/roles'
 
 export default function AppShell({ organizationName, userEmail, role, active, onNavigate, onSignOut, children }) {
   const [online, setOnline] = useState(navigator.onLine)
@@ -16,15 +17,18 @@ export default function AppShell({ organizationName, userEmail, role, active, on
     }
   }, [])
 
-  const items = [
+  const allItems = [
     ['dashboard', '⌂', 'Dashboard'],
     ['assets', '▣', 'Assets'],
     ['sites', '⌖', 'Sites'],
     ['inspect', '＋', 'Inspect'],
     ['work', '◇', 'Work Orders'],
+    ['planning', '△', 'Planning'],
     ['knowledge', '✦', 'Knowledge'],
-    ...(['owner','admin','manager','supervisor'].includes(role) ? [['supervisor', '◎', 'Supervisor']] : []),
+    ['supervisor', '◎', 'Supervisor'],
   ]
+  const allowed = allowedViews(role)
+  const items = allItems.filter(([id]) => allowed.includes(id))
 
   return (
     <div className="app-frame">
@@ -34,6 +38,7 @@ export default function AppShell({ organizationName, userEmail, role, active, on
           {items.map(([id, icon, label]) => <button key={id} className={active === id ? 'nav-button active' : 'nav-button'} onClick={() => onNavigate(id)}><span>{icon}</span>{label}</button>)}
         </nav>
         <div className="side-footer">
+          <span className="workspace-pill">{workspaceLabel(role)}</span>
           <span className={online ? "network-pill online" : "network-pill offline"}>{online ? "● Online" : "● Offline"}</span>
           <InstallApp />
           <small>{organizationName}</small>
@@ -43,7 +48,7 @@ export default function AppShell({ organizationName, userEmail, role, active, on
       </aside>
       <div className="main-column">
         <header className="mobile-header">
-          <div className="side-brand"><span>PS</span><div><strong>PolyShield</strong><small>Asset IQ</small></div></div>
+          <div className="side-brand"><span>PS</span><div><strong>PolyShield</strong><small>{workspaceLabel(role)}</small></div></div>
           <div className="mobile-header-actions">
             <span className={online ? "network-dot online" : "network-dot offline"} title={online ? "Online" : "Offline"}></span>
             <InstallApp />

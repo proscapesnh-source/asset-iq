@@ -354,11 +354,15 @@ export async function createAssetLifecycleEvent(organizationId, assetId, form) {
   return data
 }
 
-export async function createInspection({ organizationId, userId, asset, form, photos }) {
+export async function createInspection({ organizationId, userId, asset, form, photos, clientSubmissionId = null }) {
   const healthScore = healthFromCondition(form.condition)
   const status = statusFromHealth(healthScore)
 
-  const { data: inspection, error } = await supabase.from('inspections').insert({
+  if (clientSubmissionId) {
+    const { data: existing } = await supabase.from('inspections').select('*').eq('organization_id', organizationId).eq('client_submission_id', clientSubmissionId).maybeSingle()
+    if (existing) return existing
+  }
+  const inspectionPayload = {
     organization_id: organizationId,
     asset_id: asset.id,
     inspector_id: userId,
@@ -368,7 +372,13 @@ export async function createInspection({ organizationId, userId, asset, form, ph
     action_required: form.action_required,
     notes: form.notes.trim() || null,
     health_score: healthScore,
-  }).select('*').single()
+  }
+  if (clientSubmissionId) inspectionPayload.client_submission_id = clientSubmissionId
+  let { data: inspection, error } = await supabase.from('inspections').insert(inspectionPayload).select('*').single()
+  if (error && clientSubmissionId && (error.code === '42703' || /client_submission_id/i.test(error.message || ''))) {
+    delete inspectionPayload.client_submission_id
+    ;({ data: inspection, error } = await supabase.from('inspections').insert(inspectionPayload).select('*').single())
+  }
   if (error) throw error
 
   for (const item of photos) {
@@ -388,13 +398,18 @@ export async function createInspection({ organizationId, userId, asset, form, ph
       ai_correction: item.ai_correction || null,
       ai_corrected: Boolean(item.ai_corrected),
     }
-    let { error: photoError } = await supabase.from('inspection_photos').insert(photoPayload)
+    let { data: savedPhoto, error: photoError } = await supabase.from('inspection_photos').insert(photoPayload).select('*').single()
     if (photoError && (photoError.code === '42703' || /ai_(analysis|original_analysis|correction|corrected)/i.test(photoError.message || ''))) {
       const legacyPayload = { ...photoPayload }
       delete legacyPayload.ai_analysis; delete legacyPayload.ai_original_analysis; delete legacyPayload.ai_correction; delete legacyPayload.ai_corrected
-      ;({ error: photoError } = await supabase.from('inspection_photos').insert(legacyPayload))
+      ;({ data: savedPhoto, error: photoError } = await supabase.from('inspection_photos').insert(legacyPayload).select('*').single())
     }
     if (photoError) throw photoError
+    if (item.ai_corrected && item.ai_correction && item.ai_original_analysis && savedPhoto?.id) {
+      const feedback = { organization_id:organizationId, asset_id:asset.id, inspection_id:inspection.id, inspection_photo_id:savedPhoto.id, original_analysis:item.ai_original_analysis, corrected_analysis:item.ai_analysis || item.ai_correction, correction_note:item.ai_correction.correction_note || null, status:'approved', corrected_by:userId, approved_by:userId, approved_at:new Date().toISOString() }
+      const { error: feedbackError } = await supabase.from('ai_inspection_feedback').insert(feedback)
+      if (feedbackError && feedbackError.code !== '42P01') console.warn('AI feedback:', feedbackError.message)
+    }
   }
 
   const { error: assetUpdateError } = await supabase.from('assets').update({
@@ -441,6 +456,10 @@ export async function createWorkOrder(organizationId, form) {
     priority: form.priority,
     status: 'Open',
     due_date: form.due_date || null,
+    estimated_cost: form.estimated_cost ? Number(form.estimated_cost) : null,
+    approved_budget: form.approved_budget ? Number(form.approved_budget) : null,
+    vendor_name: form.vendor_name?.trim() || null,
+    purchase_order_number: form.purchase_order_number?.trim() || null,
   }).select('*').single()
   if (error) throw error
   return data
@@ -485,7 +504,11 @@ export async function fetchKnowledgeBase(organizationId) {
     }
     return [key, data || []]
   }))
-  return Object.fromEntries(entries)
+  const knowledge = Object.fromEntries(entries)
+  const { data: verifiedCorrections, error } = await supabase.from('ai_inspection_feedback').select('original_analysis, corrected_analysis, correction_note, created_at').eq('organization_id', organizationId).eq('status', 'approved').order('created_at', { ascending: false }).limit(30)
+  if (error && error.code !== '42P01' && error.code !== '42501') console.warn('Verified corrections unavailable:', error.message)
+  knowledge.verifiedCorrections = error ? [] : (verifiedCorrections || [])
+  return knowledge
 }
 
 export async function createKnowledgeRecord(organizationId, library, record) {

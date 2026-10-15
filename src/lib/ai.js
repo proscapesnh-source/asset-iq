@@ -46,6 +46,7 @@ export async function analyzeInspectionPhoto(photo, asset, knowledge = {}, inspe
         failures: (knowledge.failures || []).slice(0, 45).map((x) => ({ name:x.name, category:x.category, visual_indicators:x.visual_indicators, severity_guidance:x.severity_guidance, verification:x.verification })),
         repairs: (knowledge.repairs || []).slice(0, 15).map((x) => ({ name:x.name, compatible_families:x.compatible_families, surface_prep:x.surface_prep, procedure:x.procedure, qa_qc:x.qa_qc, limitations:x.limitations })),
         standards: (knowledge.standards || []).slice(0, 20).map((x) => ({ name:x.name, source:x.source, version:x.version, scope:x.scope, guidance:x.guidance })),
+        verified_corrections: (knowledge.verifiedCorrections || []).slice(0, 12).map((x) => ({ original:x.original_analysis, corrected:x.corrected_analysis, correction_note:x.correction_note })),
       },
     }),
   })

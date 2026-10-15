@@ -200,6 +200,8 @@ Asset context:
 Organization-approved Knowledge Center records (may be empty):
 ${knowledgeText}
 
+The verified_corrections entries are field-confirmed examples from this organization. Use them as organization-specific precedent when the current visual and asset context are relevant. Never copy an example blindly when the current photograph differs.
+
 Technician correction from the field (authoritative for explicitly corrected fields; re-evaluate the rest of the image around it):
 ${correctionText}
 
