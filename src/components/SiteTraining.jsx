@@ -1,4 +1,5 @@
 import SitePersonnel from './SitePersonnel'
+import OSHAStarterResources from './OSHAStarterResources'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
@@ -131,6 +132,7 @@ export default function SiteTraining({ sites = [], organizationId, userId, role 
 
   return <div className="page-stack">
     <div className="page-heading"><div><p className="eyebrow">Site-specific readiness</p><h1>Site Safety Training</h1><p>Review required site training, acknowledge completion and share approved modules between your organization's locations.</p></div></div>
+    <OSHAStarterResources />
     <section className="panel"><label><input type="checkbox" checked={showNetwork} onChange={e=>setShowNetwork(e.target.checked)} /> Include training shared by other enrolled sites</label><label>Filter by site
       <select value={siteId} onChange={e => setSiteId(e.target.value)}><option value="">All sites</option>{sites.map(site => <option key={site.id} value={site.id}>{site.name}</option>)}</select>
     </label><p className="muted">{remaining} required module{remaining === 1 ? '' : 's'} awaiting your acknowledgment in this view. Completion does not replace site authorization, permits, or practical competency checks.</p></section>
