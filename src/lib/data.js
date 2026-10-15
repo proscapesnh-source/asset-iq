@@ -407,7 +407,7 @@ export async function createInspection({ organizationId, userId, asset, form, ph
     }
     if (photoError) throw photoError
     if (item.ai_corrected && item.ai_correction && item.ai_original_analysis && savedPhoto?.id) {
-      const feedback = { organization_id:organizationId, asset_id:asset.id, inspection_id:inspection.id, inspection_photo_id:savedPhoto.id, original_analysis:item.ai_original_analysis, corrected_analysis:item.ai_analysis || item.ai_correction, correction_note:item.ai_correction.correction_note || null, status:'approved', corrected_by:userId, approved_by:userId, approved_at:new Date().toISOString() }
+      const feedback = { organization_id:organizationId, asset_id:asset.id, inspection_id:inspection.id, inspection_photo_id:savedPhoto.id, original_analysis:item.ai_original_analysis, corrected_analysis:item.ai_analysis || item.ai_correction, correction_note:item.ai_correction.correction_note || null, status:'pending', corrected_by:userId }
       const { error: feedbackError } = await supabase.from('ai_inspection_feedback').insert(feedback)
       if (feedbackError && feedbackError.code !== '42P01') console.warn('AI feedback:', feedbackError.message)
     }
