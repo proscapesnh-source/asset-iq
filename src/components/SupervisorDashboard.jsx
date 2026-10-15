@@ -8,6 +8,11 @@ export default function SupervisorDashboard({ data, role, organizationId }) {
   const [teamError, setTeamError] = useState('')
   const [teamMessage, setTeamMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [pendingFeedback, setPendingFeedback] = useState([])
+  const [reviewError, setReviewError] = useState('')
+  const loadFeedback = async () => { const { data: items, error } = await supabase.rpc('pending_ai_feedback', { p_organization_id: organizationId }); if (error) throw error; setPendingFeedback(items || []) }
+  useEffect(() => { if (!organizationId) return; loadFeedback().catch(error => setReviewError(error.message)) }, [organizationId])
+  const reviewFeedback = async (id, approve) => { setBusy(true); setReviewError(''); try { const { error } = await supabase.rpc('review_ai_feedback', { p_feedback_id: id, p_approve: approve }); if (error) throw error; await loadFeedback() } catch (error) { setReviewError(error.message) } finally { setBusy(false) } }
   const refreshTechnicians = async () => {
     const { data: rows, error } = await supabase.rpc('list_technicians', { p_organization_id: organizationId })
     if (error) throw error
@@ -39,6 +44,7 @@ export default function SupervisorDashboard({ data, role, organizationId }) {
   return <div className="page-stack">
     <div className="page-heading"><div><p className="eyebrow">Operations accountability</p><h1>Supervisor dashboard</h1><p>Inspection status, maintenance follow-through, and a permanent activity trail.</p></div></div>
     <section className="metric-grid"><article><strong>{overdue.length}</strong><span>Overdue inspections</span></article><article><strong>{open.length}</strong><span>Open work orders</span></article><article><strong>{data.inspections?.length || 0}</strong><span>Recent inspections</span></article><article><strong>{data.activity?.length || 0}</strong><span>Recent logged actions</span></article></section>
+    <section className="panel"><div className="section-header"><div><p className="eyebrow">AI quality control</p><h2>Review technician corrections ({pendingFeedback.length})</h2></div></div><p className="muted">Only approved corrections enter the AI learning library. Confirm each against the inspection record before approval.</p>{reviewError && <p role="alert">{reviewError}</p>}{!pendingFeedback.length ? <p className="muted">No corrections awaiting approval.</p> : <div className="activity-list">{pendingFeedback.map(item => <article key={item.feedback_id}><div><strong>{item.corrected_analysis?.title || 'Inspection correction'}</strong><p>{item.correction_note || 'Technician supplied corrected inspection findings.'}</p><p><b>Original:</b> {item.original_analysis?.summary || 'Not provided'}</p><p><b>Corrected:</b> {item.corrected_analysis?.summary || 'Not provided'}</p><small>{new Date(item.created_at).toLocaleString()}</small></div><div><button type="button" className="secondary-button" disabled={busy} onClick={() => reviewFeedback(item.feedback_id,true)}>Approve</button><button type="button" className="danger-text" disabled={busy} onClick={() => reviewFeedback(item.feedback_id,false)}>Reject</button></div></article>)}</div>}</section>
     <section className="panel"><div className="section-header"><div><p className="eyebrow">Team access</p><h2>Manage technicians</h2></div></div>
       <p className="muted">Add existing PolyShield accounts by email, or remove technician access without deleting their inspection history. New technicians must create their account first.</p>
       <form className="form-stack" onSubmit={addTechnician}><label>Technician email<input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="technician@company.com" /></label><button className="primary-button" disabled={busy || !organizationId}>{busy ? 'Saving…' : 'Add technician'}</button></form>
