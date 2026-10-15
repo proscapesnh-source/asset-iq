@@ -14,6 +14,8 @@ export default function SiteTraining({ sites = [], organizationId, userId, role 
   const [showNetwork, setShowNetwork] = useState(true)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [photoBusy, setPhotoBusy] = useState(false)
+  const [importNotes, setImportNotes] = useState('')
   const [busy, setBusy] = useState(false)
   const [revision, setRevision] = useState(0)
 
@@ -38,6 +40,40 @@ export default function SiteTraining({ sites = [], organizationId, userId, role 
     load().catch(e => { if (active) setError(e.message || 'Unable to load site training.') })
     return () => { active = false }
   }, [organizationId, revision])
+
+  async function importPhoto(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setPhotoBusy(true); setError(''); setImportNotes('')
+    try {
+      if (!file.type.startsWith('image/')) throw new Error('Select a photo of the training document.')
+      const imageDataUrl = await new Promise((resolve,reject) => {
+        const reader = new FileReader()
+        reader.onerror=()=>reject(new Error('Unable to read photo.'))
+        reader.onload=()=>{
+          const image = new Image()
+          image.onerror=()=>reject(new Error('Invalid image.'))
+          image.onload=()=>{
+            const scale=Math.min(1,1600/Math.max(image.width,image.height))
+            const canvas=document.createElement('canvas')
+            canvas.width=Math.round(image.width*scale)
+            canvas.height=Math.round(image.height*scale)
+            canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height)
+            resolve(canvas.toDataURL('image/jpeg',0.8))
+          }
+          image.src=reader.result
+        }
+        reader.readAsDataURL(file)
+      })
+      const response=await fetch('/api/analyze-photo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'training-document',imageDataUrl})})
+      const body=await response.json().catch(()=>({}))
+      if(!response.ok) throw new Error(body.error||'Training photo extraction failed.')
+      const draft=body.analysis||{}
+      setForm(previous=>({...previous,title:draft.title||previous.title,instructions:draft.instructions||previous.instructions}))
+      setImportNotes(draft.notes||'Photo transcription ready. Check every field before publishing.')
+      setMessage('Photo converted to an editable training draft. Review before publishing.')
+    } catch(e) {setError(e.message)} finally {setPhotoBusy(false);event.target.value=''}
+  }
 
   async function create(event) {
     event.preventDefault()
@@ -100,7 +136,7 @@ export default function SiteTraining({ sites = [], organizationId, userId, role 
     </label><p className="muted">{remaining} required module{remaining === 1 ? '' : 's'} awaiting your acknowledgment in this view. Completion does not replace site authorization, permits, or practical competency checks.</p></section>
     {error && <section className="error-banner" role="alert">{error}</section>}
     {message && <p role="status">{message}</p>}
-    {canManage && <section className="panel"><h2>Publish site training</h2><form className="form-stack" onSubmit={create}>
+    {canManage && <section className="panel"><h2>Publish site training</h2><div className="form-stack"><label>Import existing training from a photo<input type="file" accept="image/*" capture="environment" disabled={photoBusy || busy} onChange={importPhoto}/></label><p className="muted">Take a picture of a site induction, training sheet or safety notice. AI transcribes it as an editable draft; a supervisor must check it before publishing. The picture is processed for extraction and is not saved to the training record.</p>{photoBusy && <p>Reading training photo…</p>}{importNotes && <p role="status">{importNotes}</p>}</div><form className="form-stack" onSubmit={create}>
       <label>Site<select required value={form.site_id} onChange={e => setForm({ ...form, site_id: e.target.value })}><option value="">Select site</option>{sites.map(s => <option value={s.id} key={s.id}>{s.name}</option>)}</select></label>
       <label>Training title<input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Site orientation / fall protection / confined space" /></label>
       <label>Safety training content<textarea rows="6" required value={form.instructions} onChange={e => setForm({ ...form, instructions: e.target.value })} placeholder="Site hazards, PPE, emergency procedures, isolation requirements, contacts and required training instructions" /></label>
