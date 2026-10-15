@@ -20,7 +20,7 @@ const WORKSPACE_VIEWS = {
   supervisor: ['dashboard', 'assets', 'sites', 'site-training', 'work', 'planning', 'knowledge', 'supervisor'],
   technician: ['dashboard', 'assets', 'inspect', 'site-training', 'planning', 'knowledge'],
   maintenance: ['dashboard', 'assets', 'site-training', 'work', 'planning', 'knowledge'],
-  viewer: ['dashboard', 'assets'],
+  viewer: ['dashboard', 'assets', 'site-training'],
 }
 
 export function allowedViews(role) {
