@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import AuthScreen from './components/AuthScreen'
+import OrganizationInvitation from './components/OrganizationInvitation'
 import AppShell from './components/AppShell'
 import Dashboard from './components/Dashboard'
 import AssetsRegistry from './components/AssetsRegistry'
@@ -22,6 +23,7 @@ import { canAccessView, capabilitiesForRole } from './lib/roles'
 
 export default function App() {
   const [session, setSession] = useState(undefined)
+  const [inviteToken,setInviteToken]=useState(new URLSearchParams(window.location.search).get('invite'))
   const [context, setContext] = useState(null)
   const [view, setView] = useState('dashboard')
   const [assets, setAssets] = useState([])
@@ -146,6 +148,7 @@ export default function App() {
   if (session === undefined) return <div className="full-loading">Loading PolyShield Asset IQ…</div>
   if (!session) return <AuthScreen />
   if (passwordRecovery) return <AuthScreen recovery onRecoveryComplete={() => setPasswordRecovery(false)} />
+  if (inviteToken) return <OrganizationInvitation token={inviteToken} onDone={()=>{const url=new URL(window.location.href);url.searchParams.delete('invite');window.history.replaceState({},'',url);setInviteToken(null)}} />
   if (qrPassport) return <QRAssetPassport passport={qrPassport} onClose={() => { setQrPassport(null); const url = new URL(window.location.href); url.searchParams.delete('asset'); window.history.replaceState({}, '', url) }} />
 
   if (fatalError && !context) return <main className="setup-error"><section><h1>Setup needed</h1><p>{fatalError}</p><button className="secondary-button" onClick={() => window.location.reload()}>Try again</button><button className="text-button" onClick={() => supabase.auth.signOut()}>Sign out</button></section></main>
