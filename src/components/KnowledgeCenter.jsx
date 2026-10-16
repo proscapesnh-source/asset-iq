@@ -11,10 +11,17 @@ const LIBRARIES = {
       ['color','Typical color','text','Optional'], ['dft_range','Typical DFT','text','e.g. 80–120 mils'],
       ['service_environment','Service environment','text','Potable water, wastewater, chemical…'],
       ['surface_prep','Surface preparation','textarea','Known manufacturer/specification requirements'],
+      ['pot_life','Pot life','text','At specified mixed-material temperature'],
+      ['mix_ratio','Mix ratio','text','A:B by volume or weight'],
+      ['recoat_window','Recoat window','text','At specified surface temperature'],
+      ['cure_schedule','Cure / immersion return to service','textarea','At specified surface temperature'],
+      ['application_conditions','Application limits','textarea','Temperature, dew point, humidity'],
+      ['specification_notes','TDS verification / caveats','textarea','Region, revision, unusual restrictions'],
+
       ['visual_characteristics','Visual characteristics','textarea','Appearance cues useful for classification'],
       ['failure_modes','Common failure modes','textarea','Blistering, delamination, abrasion…'],
       ['repair_guidance','Repair / compatibility notes','textarea','Approved or known repair approach'],
-      ['reference_url','TDS / reference URL','text','Optional manufacturer document link'],
+      ['reference_url','Manufacturer TDS / reference URL','text','Optional manufacturer document link'],
     ],
   },
   failures: {
