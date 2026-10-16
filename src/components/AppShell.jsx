@@ -5,6 +5,7 @@ import { allowedViews, workspaceLabel } from '../lib/roles'
 
 export default function AppShell({ organizationName, userEmail, role, active, onNavigate, onSignOut, children }) {
   const [online, setOnline] = useState(navigator.onLine)
+  const [showMore, setShowMore] = useState(false)
 
   useEffect(() => {
     const on = () => setOnline(true)
@@ -30,13 +31,17 @@ export default function AppShell({ organizationName, userEmail, role, active, on
   ]
   const allowed = allowedViews(role)
   const items = allItems.filter(([id]) => allowed.includes(id))
+  const primaryIds = ['dashboard', 'assets', 'site-training', ...(allowed.includes('inspect') ? ['inspect'] : allowed.includes('work') ? ['work'] : [])]
+  const primaryItems = items.filter(([id]) => primaryIds.includes(id)).slice(0, 4)
+  const moreItems = items.filter(([id]) => !primaryItems.some(([primaryId]) => primaryId === id))
+  const onNav = id => { setShowMore(false); onNavigate(id) }
 
   return (
     <div className="app-frame">
       <aside className="sidebar">
         <div className="side-brand"><span>PS</span><div><strong>PolyShield</strong><small>Asset IQ</small></div></div>
         <nav>
-          {items.map(([id, icon, label]) => <button key={id} className={active === id ? 'nav-button active' : 'nav-button'} onClick={() => onNavigate(id)}><span>{icon}</span>{label}</button>)}
+          {items.map(([id, icon, label]) => <button key={id} className={active === id ? 'nav-button active' : 'nav-button'} onClick={() => onNav(id)}><span>{icon}</span>{label}</button>)}
         </nav>
         <div className="side-footer">
           <span className="workspace-pill">{workspaceLabel(role)}</span>
@@ -57,8 +62,10 @@ export default function AppShell({ organizationName, userEmail, role, active, on
           </div>
         </header>
         <main className="content">{children}</main>
-        <nav className="bottom-nav" style={{ '--nav-count': items.length }}>
-          {items.map(([id, icon, label]) => <button key={id} className={active === id ? 'active' : ''} onClick={() => onNavigate(id)}><span>{icon}</span><small>{label}</small></button>)}
+        {showMore && <div className="panel" style={{ position:'fixed', bottom:75, left:12, right:12, zIndex:50, maxHeight:'55vh', overflowY:'auto', boxShadow:'0 0 24px #0003' }}><strong>More tools</strong><div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:10,marginTop:12}}>{moreItems.map(([id,icon,label])=><button type="button" key={id} className="secondary-button" style={{minHeight:52}} onClick={()=>onNav(id)}>{icon} {label}</button>)}</div></div>}
+        <nav className="bottom-nav" style={{ '--nav-count': primaryItems.length + (moreItems.length ? 1 : 0) }}>
+          {primaryItems.map(([id, icon, label]) => <button key={id} className={active === id ? 'active' : ''} onClick={() => onNav(id)}><span>{icon}</span><small>{label}</small></button>)}
+          {moreItems.length > 0 && <button type="button" className={showMore || moreItems.some(([id])=>id===active) ? 'active' : ''} aria-expanded={showMore} aria-label="More navigation options" onClick={()=>setShowMore(v=>!v)}><span>☰</span><small>More</small></button>}
         </nav>
       </div>
       <PhotoSaveViewer />
