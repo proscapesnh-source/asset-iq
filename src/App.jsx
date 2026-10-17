@@ -25,6 +25,8 @@ import { canAccessView, capabilitiesForRole } from './lib/roles'
 export default function App() {
   const [session, setSession] = useState(undefined)
   const [inviteToken,setInviteToken]=useState(new URLSearchParams(window.location.search).get('invite'))
+  const [awaitingInvitationApproval,setAwaitingInvitationApproval]=useState(false)
+  const [approvalCheckError,setApprovalCheckError]=useState('')
   const [context, setContext] = useState(null)
   const [view, setView] = useState('dashboard')
   const [assets, setAssets] = useState([])
@@ -80,7 +82,7 @@ export default function App() {
   }, [context])
 
   useEffect(() => {
-    if (!session) { setContext(null); return }
+    if (!session || inviteToken || awaitingInvitationApproval) { setContext(null); return }
     let alive = true
     ;(async () => {
       try {
@@ -106,7 +108,7 @@ export default function App() {
       } catch (error) { if (alive) setFatalError(`${error.message}. Make sure you ran supabase/setup.sql in the new Supabase project.`) }
     })()
     return () => { alive = false }
-  }, [session])
+  }, [session, inviteToken, awaitingInvitationApproval])
 
   useEffect(() => {
     if (!context) return
@@ -149,7 +151,8 @@ export default function App() {
   if (session === undefined) return <div className="full-loading">Loading PolyShield Asset IQ…</div>
   if (!session) return <AuthScreen />
   if (passwordRecovery) return <AuthScreen recovery onRecoveryComplete={() => setPasswordRecovery(false)} />
-  if (inviteToken) return <OrganizationInvitation token={inviteToken} onDone={()=>{const url=new URL(window.location.href);url.searchParams.delete('invite');window.history.replaceState({},'',url);setInviteToken(null)}} />
+  if (inviteToken) return <OrganizationInvitation token={inviteToken} onDone={()=>{const url=new URL(window.location.href);url.searchParams.delete('invite');window.history.replaceState({},'',url);setInviteToken(null);setAwaitingInvitationApproval(true)}} />
+  if (awaitingInvitationApproval) return <main className="setup-error"><section><h1>Waiting for organization approval</h1><p>Your invitation was accepted. An organization supervisor must approve your technician membership before you can enter its workspace.</p>{approvalCheckError && <p role="alert">{approvalCheckError}</p>}<button className="primary-button" onClick={async()=>{setApprovalCheckError('');try{const ctx=await loadContext({bootstrap:false});setContext(ctx);setAwaitingInvitationApproval(false)}catch(error){setApprovalCheckError('Your membership is not approved yet. Please try again after your supervisor approves the request.')}}}>Check approval</button><button className="secondary-button" onClick={()=>supabase.auth.signOut()}>Sign out</button></section></main>
   if (qrPassport) return <QRAssetPassport passport={qrPassport} onClose={() => { setQrPassport(null); const url = new URL(window.location.href); url.searchParams.delete('asset'); window.history.replaceState({}, '', url) }} />
 
   if (fatalError && !context) return <main className="setup-error"><section><h1>Setup needed</h1><p>{fatalError}</p><button className="secondary-button" onClick={() => window.location.reload()}>Try again</button><button className="text-button" onClick={() => supabase.auth.signOut()}>Sign out</button></section></main>
