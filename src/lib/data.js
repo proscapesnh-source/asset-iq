@@ -176,6 +176,7 @@ export async function fetchAssets(organizationId) {
 }
 
 export async function createAsset(organizationId, form, coverFile) {
+  if (!coverFile || !coverFile.type?.startsWith('image/')) throw new Error('A valid asset cover photo is required.');
   const { data: asset, error } = await supabase
     .from('assets')
     .insert({
@@ -200,7 +201,7 @@ export async function createAsset(organizationId, form, coverFile) {
     .single()
   if (error) throw error
 
-  if (coverFile) {
+  {
     try {
       const storagePath = await uploadImage(coverFile, organizationId, `assets/${asset.id}`)
       const { error: photoError } = await supabase.from('asset_photos').insert({
@@ -213,7 +214,7 @@ export async function createAsset(organizationId, form, coverFile) {
       })
       if (photoError) throw photoError
     } catch (uploadError) {
-      console.warn('Asset created, but cover photo failed:', uploadError)
+      throw new Error(`Asset record was created, but its required cover photo failed to save. Open the asset to add a cover photo instead of creating a duplicate. ${uploadError.message || ''}`)
     }
   }
 
