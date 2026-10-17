@@ -14,6 +14,7 @@ import SupervisorDashboard from './components/SupervisorDashboard'
 import Sites from './components/Sites'
 import SiteTraining from './components/SiteTraining'
 import OrganizationProfile from './components/OrganizationProfile'
+import IntegrationHub from './components/IntegrationHub'
 import QRAssetPassport from './components/QRAssetPassport'
 import PlanningTools from './components/PlanningTools'
 import { supabase } from './lib/supabase'
@@ -164,6 +165,7 @@ export default function App() {
   return <AppShell organizationName={context.organizationName} userEmail={context.user.email} role={context.role} active={active} onNavigate={navigate} onSignOut={() => supabase.auth.signOut()}>
     {loading && <div className="loading-bar"/>}
     {fatalError && <div className="error-banner">{fatalError}<button onClick={() => refreshAll()}>Retry</button></div>}
+    {view === 'integrations' && <IntegrationHub organizationId={context.organizationId} role={context.role} />}
     {view === 'dashboard' && <Dashboard data={dashboard} role={context.role} onAddAsset={() => navigate('add-asset')} onOpenAsset={openAsset} onInspect={() => navigate('inspect')} onWorkOrders={() => navigate('work')} onPlanning={() => navigate('planning')} onSupervisor={() => navigate('supervisor')} onSiteSafety={() => navigate('site-training')} onAssetFilter={(filter)=>{setAssetFilter(filter);setSiteFilter('All');setView('assets')}} />}
     {view === 'assets' && <AssetsRegistry assets={assets} sites={sites} initialFilter={assetFilter} initialSiteId={siteFilter} canAdd={permissions.manageAssets} canInspect={permissions.inspect} onAdd={() => navigate('add-asset')} onOpen={openAsset} onInspect={(asset) => { setSelectedAsset(asset); setView('inspect') }} />}
     {view === 'add-asset' && <AddAssetForm sites={sites} onCancel={() => navigate('assets')} onSave={async (form, file) => { const asset = await createAsset(context.organizationId, form, file); await refreshAll(); flash('Asset created.'); await openAsset(asset) }} />}
