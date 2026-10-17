@@ -30,6 +30,7 @@ export default function AppShell({ organizationName, userEmail, role, active, on
     ['knowledge', '✦', 'Knowledge'],
     ['supervisor', '◎', 'Supervisor'],
     ['integrations', '⇄', 'Integrations'],
+    ['projects', '▤', 'Projects'],
   ]
   const allowed = allowedViews(role)
   const items = allItems.filter(([id]) => allowed.includes(id))
