@@ -27,6 +27,7 @@ create table if not exists public.job_start_confirmation_events (
  details text,
  created_at timestamptz not null default now()
 );
+grant select on public.job_start_confirmations, public.job_start_confirmation_events to authenticated;
 alter table public.job_start_confirmations enable row level security;
 alter table public.job_start_confirmation_events enable row level security;
 create policy job_start_read on public.job_start_confirmations for select to authenticated using (
