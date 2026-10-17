@@ -17,8 +17,8 @@ export function workspaceLabel(role) {
 }
 
 const WORKSPACE_VIEWS = {
-  supervisor: ['dashboard', 'assets', 'sites', 'site-training', 'work', 'planning', 'knowledge', 'supervisor'],
-  technician: ['dashboard', 'assets', 'inspect', 'site-training', 'planning', 'knowledge'],
+  supervisor: ['dashboard', 'assets', 'sites', 'site-training', 'job-starts', 'work', 'planning', 'knowledge', 'supervisor'],
+  technician: ['dashboard', 'assets', 'inspect', 'site-training', 'job-starts', 'planning', 'knowledge'],
   maintenance: ['dashboard', 'assets', 'site-training', 'work', 'planning', 'knowledge'],
   viewer: ['dashboard', 'assets', 'site-training'],
 }
