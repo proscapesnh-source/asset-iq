@@ -30,11 +30,13 @@ export default function AddAssetForm({ onCancel, onSave, initialValues = null, m
 
   const submit = async (event) => {
     event.preventDefault(); setBusy(true); setError('')
-    try { await onSave(form, file) } catch (e) { setError(e.message || `Could not ${editing ? 'update' : 'create'} asset.`); setBusy(false) }
+    try { if (!editing && !file) throw new Error('An asset cover photo is required before creating the asset.'); await onSave(form, file) } catch (e) { setError(e.message || `Could not ${editing ? 'update' : 'create'} asset.`); setBusy(false) }
   }
 
   const choosePhoto = (event) => {
     const next = event.target.files?.[0] || null
+    if (next && !next.type.startsWith('image/')) { setError('Choose an image for the asset cover photo.'); setFile(null); return }
+    setError('')
     setFile(next)
     setPreview((current) => {
       if (current?.startsWith('blob:')) URL.revokeObjectURL(current)
@@ -67,7 +69,7 @@ export default function AddAssetForm({ onCancel, onSave, initialValues = null, m
     <label>Site / Facility<select value={form.site_id || ''} onChange={(e) => { const site = sites.find(s => s.id === e.target.value); setForm(current => ({ ...current, site_id:e.target.value, facility:site?.name || current.facility })) }}><option value="">Legacy / unassigned</option>{sites.map(site => <option key={site.id} value={site.id}>{site.name}</option>)}</select></label><label>Location<input value={form.location} onChange={(e) => set('location', e.target.value)} placeholder="Building / area / coordinates" /></label>
     <label>Manufacturer<input value={form.manufacturer} onChange={(e) => set('manufacturer', e.target.value)} /></label><label>Model<input value={form.model} onChange={(e) => set('model', e.target.value)} /></label>
     <label>Serial number<input value={form.serial_number} onChange={(e) => set('serial_number', e.target.value)} /></label><label>Install date<input type="date" value={form.install_date || ''} onChange={(e) => set('install_date', e.target.value)} /></label>
-    <label>Next inspection<input type="date" value={form.next_inspection_date || ''} onChange={(e) => set('next_inspection_date', e.target.value)} /></label><label>{editing ? 'Replace cover photo' : 'Cover photo'}<input type="file" accept="image/*" onChange={choosePhoto} /></label>
+    <label>Next inspection<input type="date" value={form.next_inspection_date || ''} onChange={(e) => set('next_inspection_date', e.target.value)} /></label><label>{editing ? 'Replace cover photo (optional)' : 'Cover photo * (required)'}<input type="file" accept="image/*" required={!editing} onChange={choosePhoto} /></label>
     {preview && <div className="form-photo-preview"><img src={preview} alt="Selected cover" /></div>}
     <label className="full-width">Notes<textarea rows="4" value={form.notes || ''} onChange={(e) => set('notes', e.target.value)} /></label>
     {editing && <div className="field-help full-width">Inspection history, health score, and lifecycle records are protected and are not changed from this screen.</div>}
