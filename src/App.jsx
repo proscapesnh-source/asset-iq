@@ -8,6 +8,7 @@ import AddAssetForm from './components/AddAssetForm'
 import InspectionForm from './components/InspectionForm'
 import AssetDetail from './components/AssetDetail'
 import WorkOrders from './components/WorkOrders'
+import JobStartConfirmations from './components/JobStartConfirmations'
 import KnowledgeCenter from './components/KnowledgeCenter'
 import SupervisorDashboard from './components/SupervisorDashboard'
 import Sites from './components/Sites'
@@ -200,6 +201,7 @@ export default function App() {
     {view === 'sites' && <><Sites sites={sites} assets={assets} canManage={['owner','admin','manager','supervisor'].includes(context.role)} onCreate={async(form)=>{await createSite(context.organizationId,form);await refreshAll();flash('Site created.')}} onOpenAssets={(siteId)=>{setAssetFilter(null);setSiteFilter(siteId);setView('assets')}}/><OrganizationProfile organization={organizationProfile} canManage={['owner','admin'].includes(context.role)} onSave={async(updates,file)=>{await updateOrganizationProfile(context.organizationId,updates,file);await refreshAll();flash('Organization branding saved.')}}/></>}
     {view === 'knowledge' && <KnowledgeCenter knowledge={knowledge} onCreate={async (library, record) => { await createKnowledgeRecord(context.organizationId, library, record); await refreshAll(); flash('Knowledge record saved.') }} onDelete={async (library, id) => { await deleteKnowledgeRecord(library, id); await refreshAll(); flash('Knowledge record removed.') }} onSeed={async (starter) => { await seedKnowledgeBase(context.organizationId, starter); await refreshAll(); flash('Starter inspection knowledge loaded.') }} />}
     {view === 'site-training' && <SiteTraining sites={sites} organizationId={context.organizationId} userId={context.user.id} role={context.role} />}
+    {view === 'job-starts' && <JobStartConfirmations organizationId={context.organizationId} userEmail={context.user.email} role={context.role} sites={sites} />}
     {view === 'supervisor' && <SupervisorDashboard data={dashboard} role={context.role} organizationId={context.organizationId} onOpenAsset={openAsset} />}
     {view === 'work' && <WorkOrders workOrders={workOrders} assets={assets} canManageBudget={permissions.manageBudget} onCreate={async (form) => { await createWorkOrder(context.organizationId, form); await refreshAll(); flash('Work order created.') }} onUpdate={async (id, updates) => { await updateWorkOrder(id, updates); await refreshAll(); flash('Work order updated.') }} />}
     {view === 'planning' && <PlanningTools workOrders={workOrders} role={context.role} />}

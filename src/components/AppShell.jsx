@@ -25,6 +25,7 @@ export default function AppShell({ organizationName, userEmail, role, active, on
     ['site-training', '♧', 'Site Safety'],
     ['inspect', '＋', 'Inspect'],
     ['work', '◇', 'Work Orders'],
+    ['job-starts', '✓', 'Job Starts'],
     ['planning', '△', 'Planning'],
     ['knowledge', '✦', 'Knowledge'],
     ['supervisor', '◎', 'Supervisor'],
