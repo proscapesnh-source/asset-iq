@@ -105,7 +105,7 @@ export default function App() {
             }
           }
         }
-      } catch (error) { if (alive) setFatalError(`${error.message}. Make sure you ran supabase/setup.sql in the new Supabase project.`) }
+      } catch (error) { if (alive) { if (error.message?.includes('TECHNICIAN_INVITATION_PENDING_APPROVAL')) { setAwaitingInvitationApproval(true); setFatalError('') } else setFatalError(`${error.message}. Make sure you ran supabase/setup.sql in the new Supabase project.`) } }
     })()
     return () => { alive = false }
   }, [session, inviteToken, awaitingInvitationApproval])
