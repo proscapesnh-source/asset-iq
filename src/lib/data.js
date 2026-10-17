@@ -56,12 +56,13 @@ export async function bootstrapOrganization(user) {
   return data
 }
 
-export async function loadContext() {
+export async function loadContext({ bootstrap = true } = {}) {
   const { data: { user }, error: userError } = await supabase.auth.getUser()
   if (userError) throw userError
   if (!user) throw new Error('No signed-in user.')
 
-  await bootstrapOrganization(user)
+  // Invitation acceptance must never bootstrap a new owner organization.
+  if (bootstrap) await bootstrapOrganization(user)
 
   const { data: membership, error } = await supabase
     .from('organization_members')
