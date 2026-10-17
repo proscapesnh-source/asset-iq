@@ -12,5 +12,5 @@ export default function OrganizationInvitation({ token, onDone }) {
     else setMessage('Invitation accepted. A supervisor must approve your membership before organization access is granted.')
     setBusy(false)
   }
-  return <main className="setup-error"><section><h1>PolyShield organization invitation</h1><p>Accept this invitation to request membership. A supervisor must approve access. Your existing training credentials remain yours.</p>{error&&<p role="alert">{error}</p>}{message&&<p role="status">{message}</p>}<button className="primary-button" disabled={busy||!!message} onClick={accept}>{busy?'Accepting…':'Accept invitation'}</button><button className="secondary-button" onClick={onDone}>Continue to PolyShield</button></section></main>
+  return <main className="setup-error"><section><h1>PolyShield organization invitation</h1><p>Accept this invitation to request membership. A supervisor must approve access. Your existing training credentials remain yours.</p>{error&&<p role="alert">{error}</p>}{message&&<p role="status">{message}</p>}<button className="primary-button" disabled={busy||!!message} onClick={accept}>{busy?'Accepting…':'Accept invitation'}</button><button className="secondary-button" disabled={busy || !message} onClick={onDone}>Continue to PolyShield</button></section></main>
 }
