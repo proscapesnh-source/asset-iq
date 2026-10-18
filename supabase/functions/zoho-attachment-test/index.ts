@@ -1,0 +1,48 @@
+import {createClient} from 'npm:@supabase/supabase-js@2'
+const h={'Access-Control-Allow-Origin':'https://asset-iq-rouge.vercel.app','Access-Control-Allow-Methods':'POST, OPTIONS','Access-Control-Allow-Headers':'authorization,content-type,apikey','Content-Type':'application/json'}
+const out=(v:unknown,s=200)=>new Response(JSON.stringify(v),{status:s,headers:h})
+Deno.serve(async req=>{
+ if(req.method==='OPTIONS')return new Response(null,{headers:h})
+ if(req.method!=='POST')return out({error:'POST required'},405)
+ try{
+ const token=req.headers.get('authorization')?.replace(/^Bearer /i,'')
+ if(!token)return out({error:'Sign in required'},401)
+ const u=Deno.env.get('SUPABASE_URL')!, anon=Deno.env.get('SUPABASE_ANON_KEY')!
+ const client=createClient(u,anon,{global:{headers:{Authorization:'Bearer '+token}}})
+ const {data:{user}}=await client.auth.getUser(token)
+ if(!user)return out({error:'Invalid session'},401)
+ const {organization_id,queue_id}=await req.json()
+ const {data:member}=await client.from('organization_members').select('role').eq('organization_id',organization_id).eq('user_id',user.id).maybeSingle()
+ if(!member||!['owner','admin'].includes(member.role))return out({error:'Owner/Admin required'},403)
+ if(!queue_id)return out({error:'Select one specific queued attachment for a test upload'},400)
+ const db=createClient(u,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+ const {data:item}=await db.from('zoho_attachment_queue').select('*').eq('organization_id',organization_id).eq('id',queue_id).maybeSingle()
+ if(!item)return out({error:'Queue entry not found'},404)
+ if(item.status==='uploaded')return out({status:'uploaded',already_uploaded:true})
+ if(!['pending','failed'].includes(item.status))return out({error:'Attachment is not ready for upload'},409)
+ if(!['asset_photo','inspection_photo'].includes(item.source_type))return out({error:'Final PDF source support is not yet configured'},409)
+ const {data:project}=await db.from('field_projects').select('zoho_record_id,site_id,organization_id,title').eq('id',item.project_id).eq('organization_id',organization_id).maybeSingle()
+ if(!project?.zoho_record_id)return out({error:'Project has no linked Zoho JobSite'},409)
+ if(!String(project.title||'').startsWith('POLYSHIELD-ATTACHMENT-TEST-'))return out({error:'Test uploads are restricted to the dedicated PolyShield test JobSite'},403)
+ const table=item.source_type==='asset_photo'?'asset_photos':'inspection_photos'
+ const {data:photo}=await db.from(table).select('storage_path,organization_id,asset_id').eq('id',item.source_id).eq('organization_id',organization_id).maybeSingle()
+ if(!photo||photo.storage_path!==item.storage_path)return out({error:'Photo source verification failed'},409)
+ const {data:asset}=await db.from('assets').select('site_id').eq('id',photo.asset_id).eq('organization_id',organization_id).maybeSingle()
+ if(!asset||!project.site_id||asset.site_id!==project.site_id)return out({error:'Photo and project must belong to the same linked jobsite'},409)
+ const {data:cred}=await db.from('zoho_credentials').select('*').eq('organization_id',organization_id).maybeSingle()
+ if(!cred)return out({error:'Connect Zoho first'},409)
+ if(!['https://www.zohoapis.com','https://zohoapis.com'].includes(cred.api_domain))return out({error:'Unsupported Zoho API domain'},409)
+ if(new Date(cred.expires_at).getTime()<Date.now()+60000)return out({error:'Reconnect Zoho to refresh authorization before this test'},409)
+ const {data:file,error:fileError}=await db.storage.from('inspection-photos').download(item.storage_path)
+ if(fileError||!file)return out({error:'Source file not found'},409)
+ if(file.size>18*1024*1024)return out({error:'File exceeds test upload limit'},413)
+ const form=new FormData();form.append('file',file,item.file_name||'photo.jpg')
+ const res=await fetch('https://www.zohoapis.com/crm/v8/Deals/'+encodeURIComponent(project.zoho_record_id)+'/Attachments',{method:'POST',headers:{Authorization:'Zoho-oauthtoken '+cred.access_token},body:form})
+ const body=await res.json()
+ const attachment=body?.data?.[0]?.details?.id
+ if(!res.ok||!attachment)return out({error:'Zoho rejected upload; check attachment scope and Deal permissions',zoho_status:res.status},502)
+ const {error:writeError}=await db.from('zoho_attachment_queue').update({status:'uploaded',zoho_attachment_id:String(attachment),uploaded_at:new Date().toISOString(),attempts:item.attempts+1,last_error:null}).eq('id',item.id).eq('status',item.status)
+ if(writeError)return out({error:'Zoho accepted upload but local tracking failed. Do not retry until reconciled.'},503)
+ return out({status:'uploaded',attachment_id:String(attachment)})
+ }catch(e){console.error('Zoho attachment processing failed',e instanceof Error?e.message:'unknown');return out({error:'Attachment processing failed'},500)}
+})

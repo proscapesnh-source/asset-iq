@@ -1,3 +1,4 @@
+import ZohoAttachmentTools from './ZohoAttachmentTools'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
@@ -44,6 +45,11 @@ export default function FieldProjects({ organizationId, role, sites = [] }) {
   setSyncResult(result)
   setMessage(result.created+' new Purchase Order Received project(s) sent to Owner Review; '+result.existing+' previously imported.')
  })
+ const linkSite=(project,siteId)=>act(async()=>{
+  const {error:e}=await supabase.rpc('set_field_project_site',{p_project:project.id,p_site:siteId||null})
+  if(e)throw e
+  setMessage('Jobsite link updated. Reopen Projects to refresh photo choices.')
+ })
  const assign=(project)=>act(async()=>{
   const value=selection[project.id]||{}
   if(!value.user||!value.role)throw Error('Select an employee and assignment role.')
@@ -68,6 +74,8 @@ export default function FieldProjects({ organizationId, role, sites = [] }) {
     <label>Employee<select value={value.user} onChange={e=>setSelection(v=>({...v,[p.id]:{...value,user:e.target.value}}))}><option value="">Select employee</option>{options.map(s=><option key={s.user_id} value={s.user_id}>{s.email} ({s.role})</option>)}</select></label>
     <button type="button" className="secondary-button" disabled={busy||!value.user} onClick={()=>assign(p)}>Assign employee</button>
    </div>}
+   {owner&&p.zoho_record_id&&<label>Linked PolyShield jobsite<select value={p.site_id||''} disabled={busy} onChange={e=>linkSite(p,e.target.value)}><option value="">Select jobsite</option>{sites.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>}
+   {owner&&p.zoho_record_id&&<ZohoAttachmentTools organizationId={organizationId} project={p} />}
    <div className="section-actions" style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:12}}>
    {owner&&p.status==='owner_review'&&<button className="primary-button" disabled={busy} onClick={()=>transition(p,'work_scheduled')}>Move to Work Scheduled</button>}
    {owner&&p.status==='work_scheduled'&&<button className="primary-button" disabled={busy} onClick={()=>transition(p,'active')}>Start project</button>}
