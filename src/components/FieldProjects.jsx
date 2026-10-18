@@ -18,6 +18,7 @@ export default function FieldProjects({ organizationId, role, sites = [] }) {
  const [error,setError] = useState('')
  const [message,setMessage] = useState('')
  const [busy,setBusy] = useState(false)
+ const [syncResult,setSyncResult] = useState(null)
  const load = async () => {
   const [p,a,s] = await Promise.all([
    supabase.from('field_projects').select('*').eq('organization_id',organizationId).order('created_at',{ascending:false}),
@@ -31,6 +32,18 @@ export default function FieldProjects({ organizationId, role, sites = [] }) {
  const act=async(fn)=>{setBusy(true);setError('');setMessage('');try{await fn();await load()}catch(e){setError(e.message||'Action failed')}finally{setBusy(false)}}
  const rpc=async(name,args)=>{const {data,error:e}=await supabase.rpc(name,args);if(e)throw e;return data}
  const create=async(e)=>{e.preventDefault();await act(async()=>{await rpc('create_field_project',{p_org:organizationId,p_title:title.trim(),p_site:site||null,p_job_number:jobNumber||null});setTitle('');setSite('');setJobNumber('');setMessage('Project created for Owner review.')})}
+ const syncWonJobs=()=>act(async()=>{
+  const {data:{session}}=await supabase.auth.getSession()
+  if(!session?.access_token)throw new Error('Please sign in again.')
+  const response=await fetch('https://tntbijxtaatsycluiude.supabase.co/functions/v1/zoho-job-won-import',{
+   method:'POST',headers:{Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},
+   body:JSON.stringify({organization_id:organizationId})
+  })
+  const result=await response.json()
+  if(!response.ok)throw new Error(result.error||'Unable to import Job Won records.')
+  setSyncResult(result)
+  setMessage(result.created+' new Job Won project(s) sent to Owner Review; '+result.existing+' previously imported.')
+ })
  const assign=(project)=>act(async()=>{
   const value=selection[project.id]||{}
   if(!value.user||!value.role)throw Error('Select an employee and assignment role.')
@@ -40,7 +53,8 @@ export default function FieldProjects({ organizationId, role, sites = [] }) {
  const transition=(p,status)=>act(async()=>{await rpc('transition_field_project',{p_project:p.id,p_status:status});setMessage('Project status updated.')})
  return <div className="page-stack">
   <div className="page-heading"><div><p className="eyebrow">Corporate project workflow</p><h1>Projects</h1><p>Owner review, supervisor assignment, scheduling, and controlled closure.</p></div></div>
-  {owner&&<form className="panel form-stack" onSubmit={create}><h2>Create project</h2><label>Project / jobsite name<input value={title} required onChange={e=>setTitle(e.target.value)}/></label><label>Job number<input value={jobNumber} onChange={e=>setJobNumber(e.target.value)}/></label><label>Jobsite<select value={site} onChange={e=>setSite(e.target.value)}><option value="">Not linked yet</option>{sites.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><button className="primary-button" disabled={busy}>Create for Owner review</button><p className="muted">Zoho Job Won import is not connected yet. Create project records here while we build that trigger.</p></form>}
+  {owner&&<section className="panel"><h2>Zoho CRM — Job Won</h2><p>Import JobSites with the exact stage <strong>Job Won</strong> into Owner Review. Existing Zoho IDs are skipped. Nothing is scheduled and no Zoho records are changed.</p><button type="button" className="primary-button" disabled={busy} onClick={syncWonJobs}>{busy?'Checking Zoho…':'Import Job Won projects'}</button>{syncResult&&<p role="status">{syncResult.matched} matching JobSites checked · {syncResult.created} imported · {syncResult.existing} already present{syncResult.failures?.length?' · '+syncResult.failures.length+' errors':''}</p>}</section>}
+  {owner&&<form className="panel form-stack" onSubmit={create}><h2>Create project</h2><label>Project / jobsite name<input value={title} required onChange={e=>setTitle(e.target.value)}/></label><label>Job number<input value={jobNumber} onChange={e=>setJobNumber(e.target.value)}/></label><label>Jobsite<select value={site} onChange={e=>setSite(e.target.value)}><option value="">Not linked yet</option>{sites.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><button className="primary-button" disabled={busy}>Create for Owner review</button><p className="muted">Projects imported from Zoho appear above under Owner Review. You can also create test projects manually.</p></form>}
   {error&&<p role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
   <section className="panel"><h2>{owner?'All corporate projects':'My assigned projects'}</h2>{!projects.length&&<p className="muted">No accessible projects yet.</p>}
   <div className="activity-list">{projects.map(p=>{
