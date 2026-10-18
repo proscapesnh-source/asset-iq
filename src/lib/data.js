@@ -64,20 +64,21 @@ export async function loadContext({ bootstrap = true } = {}) {
   // Invitation acceptance must never bootstrap a new owner organization.
   if (bootstrap) await bootstrapOrganization(user)
 
-  const { data: membership, error } = await supabase
+  const { data: memberships, error } = await supabase
     .from('organization_members')
     .select('organization_id, role, organizations(name, report_display_name, logo_storage_path)')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
-    .limit(1)
-    .single()
   if (error) throw error
-
+  if (!memberships?.length) throw new Error('No organization membership found.')
+  const selectedId = window.localStorage.getItem('polyshield:selected-org:' + user.id)
+  const membership = memberships.find(m => m.organization_id === selectedId) || memberships[0]
   return {
     user,
     organizationId: membership.organization_id,
     organizationName: membership.organizations?.name || 'Organization',
     organization: membership.organizations || { name: 'Organization' },
+    organizations: memberships.map(m => ({ id: m.organization_id, name: m.organizations?.name || 'Organization', role: m.role })),
     role: membership.role,
   }
 }
