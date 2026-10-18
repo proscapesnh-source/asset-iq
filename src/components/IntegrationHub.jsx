@@ -16,6 +16,7 @@ export default function IntegrationHub({ organizationId, role }) {
  const [busy,setBusy] = useState(false)
  const [error,setError] = useState('')
  const [message,setMessage] = useState('')
+ const [zohoProgress,setZohoProgress] = useState('')
  const load=async()=>{const {data,error:e}=await supabase.from('integration_connections').select('*').eq('organization_id',organizationId).order('created_at',{ascending:false});if(e)throw e;setConnections(data||[])}
  useEffect(()=>{load().catch(e=>setError(e.message))},[organizationId])
  const setPermission=(key,field,value)=>setPermissions(p=>({...p,[key]:{...p[key],[field]:value}}))
@@ -33,21 +34,23 @@ export default function IntegrationHub({ organizationId, role }) {
   }catch(e){setError(e.message)}finally{setBusy(false)}
  }
  const edit=(item)=>{setEditing(item.id);setProvider(item.provider);setDisplayName(item.display_name);setDirection(item.direction);setPermissions(item.permissions||initialPermissions());setMapping(JSON.stringify(item.field_mapping||{},null,2));setMessage('');setError('')}
- const connectZoho=async()=>{setBusy(true);setError('');setMessage('');try{
+ const connectZoho=async()=>{setBusy(true);setError('');setMessage('');setZohoProgress('Checking your PolyShield session…');try{
   const {data:{session},error:sessionError}=await supabase.auth.getSession()
   if(sessionError||!session?.access_token)throw new Error('Please sign in again.')
+  setZohoProgress('Contacting Zoho authorization service…')
   const result=await fetch('https://tntbijxtaatsycluiude.supabase.co/functions/v1/zoho-oauth-start',{
    method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},
    body:JSON.stringify({organization_id:organizationId})
   })
   const data=await result.json()
   if(!result.ok||!data.url)throw new Error(data.error||'Unable to start Zoho authorization.')
+  setZohoProgress('Opening Zoho authorization…')
   window.location.assign(data.url)
- }catch(e){setError(e.message)}finally{setBusy(false)}}
+ }catch(e){setError(e.message||'Could not reach the authorization service.');setZohoProgress('Connection could not start.')}finally{setBusy(false)}}
  const pause=async(item)=>{setBusy(true);setError('');try{const {error:e}=await supabase.from('integration_connections').update({status:'paused'}).eq('id',item.id).eq('organization_id',organizationId);if(e)throw e;await load()}catch(e){setError(e.message)}finally{setBusy(false)}}
  return <div className="page-stack">
   <div className="page-heading"><div><p className="eyebrow">Organization settings</p><h1>Integration Hub</h1><p>Configure controlled two-way data exchange with your CRM and maintenance systems.</p></div></div>
-  {canManage&&<section className="panel"><h2>Zoho CRM — United States</h2><p className="muted">Authorize Zoho JobSites (Deals) read-only. No job records will be imported or changed during authorization.</p><button type="button" className="primary-button" onClick={connectZoho} disabled={busy}>{busy?'Connecting…':'Connect Zoho CRM'}</button></section>}
+  {canManage&&<section className="panel"><h2>Zoho CRM — United States</h2><p className="muted">Authorize Zoho JobSites (Deals) read-only. No job records will be imported or changed during authorization.</p><button type="button" className="primary-button" onClick={connectZoho} disabled={busy}>{busy?'Connecting…':'Connect Zoho CRM'}</button>{zohoProgress&&<p role="status" style={{marginTop:12}}>{zohoProgress}</p>}{error&&<p role="alert" className="error-message" style={{marginTop:12}}>{error}</p>}</section>}
   <section className="panel"><h2>Connections</h2><p className="muted">Setup is disabled until a secure provider connection is verified. Saving settings does not start synchronization.</p>
    {connections.length ? <div className="activity-list">{connections.map(item=><article key={item.id}><div><strong>{item.display_name}</strong><p>{PROVIDERS.find(([id])=>id===item.provider)?.[1]} · {item.direction.replaceAll('_',' ')} · {item.status.replaceAll('_',' ')}</p></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{canManage&&<><button type="button" className="secondary-button" onClick={()=>edit(item)}>Configure</button>{item.status==='connected'&&<button type="button" className="secondary-button" onClick={()=>pause(item)} disabled={busy}>Pause sync</button>}</>}</div></article>)}</div> : <p className="muted">No CRM or maintenance integrations configured.</p>}
   </section>
