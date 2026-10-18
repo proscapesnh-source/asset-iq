@@ -17,6 +17,8 @@ export default function IntegrationHub({ organizationId, role }) {
  const [error,setError] = useState('')
  const [message,setMessage] = useState('')
  const [zohoProgress,setZohoProgress] = useState('')
+ const [zohoPreview,setZohoPreview] = useState(null)
+ const [previewBusy,setPreviewBusy] = useState(false)
  const load=async()=>{const {data,error:e}=await supabase.from('integration_connections').select('*').eq('organization_id',organizationId).order('created_at',{ascending:false});if(e)throw e;setConnections(data||[])}
  useEffect(()=>{load().catch(e=>setError(e.message))},[organizationId])
  const setPermission=(key,field,value)=>setPermissions(p=>({...p,[key]:{...p[key],[field]:value}}))
@@ -47,10 +49,18 @@ export default function IntegrationHub({ organizationId, role }) {
   setZohoProgress('Opening Zoho authorization…')
   window.location.assign(data.url)
  }catch(e){setError(e.message||'Could not reach the authorization service.');setZohoProgress('Connection could not start.')}finally{setBusy(false)}}
+ const previewZoho=async()=>{setPreviewBusy(true);setError('');setZohoPreview(null);try{
+  const {data:{session}}=await supabase.auth.getSession()
+  if(!session?.access_token)throw new Error('Please sign in again.')
+  const res=await fetch('https://tntbijxtaatsycluiude.supabase.co/functions/v1/zoho-deals-preview',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({organization_id:organizationId})})
+  const data=await res.json()
+  if(!res.ok)throw new Error(data.error||'Unable to preview Zoho jobs.')
+  setZohoPreview(data)
+ }catch(e){setError(e.message||'Preview failed.')}finally{setPreviewBusy(false)}}
  const pause=async(item)=>{setBusy(true);setError('');try{const {error:e}=await supabase.from('integration_connections').update({status:'paused'}).eq('id',item.id).eq('organization_id',organizationId);if(e)throw e;await load()}catch(e){setError(e.message)}finally{setBusy(false)}}
  return <div className="page-stack">
   <div className="page-heading"><div><p className="eyebrow">Organization settings</p><h1>Integration Hub</h1><p>Configure controlled two-way data exchange with your CRM and maintenance systems.</p></div></div>
-  {canManage&&<section className="panel"><h2>Zoho CRM — United States</h2><p className="muted">Authorize Zoho JobSites (Deals) read-only. No job records will be imported or changed during authorization.</p><button type="button" className="primary-button" onClick={connectZoho} disabled={busy}>{busy?'Connecting…':'Connect Zoho CRM'}</button>{zohoProgress&&<p role="status" style={{marginTop:12}}>{zohoProgress}</p>}{error&&<p role="alert" className="error-message" style={{marginTop:12}}>{error}</p>}</section>}
+  {canManage&&<section className="panel"><h2>Zoho CRM — United States</h2><p className="muted">Authorize Zoho JobSites (Deals) read-only. No job records will be imported or changed during authorization.</p><button type="button" className="primary-button" onClick={connectZoho} disabled={busy}>{busy?'Connecting…':'Connect Zoho CRM'}</button><button type="button" className="secondary-button" style={{marginLeft:8}} disabled={previewBusy||busy} onClick={previewZoho}>{previewBusy?'Checking Zoho…':'Preview JobSites (read-only)'}</button>{zohoProgress&&<p role="status" style={{marginTop:12}}>{zohoProgress}</p>}{zohoPreview&&<div style={{marginTop:14}}><h3>Zoho JobSites preview</h3><p className="muted">Read-only sample of up to {zohoPreview.preview_limit} Deals. Nothing imported or changed.</p><p><strong>Available stages:</strong> {zohoPreview.stage_options?.length?zohoPreview.stage_options.map(s=>s.label).join(', '):'Stage list unavailable'}</p>{zohoPreview.fields_error&&<p role="status">Stage metadata unavailable: {zohoPreview.fields_error}</p>}<div className="activity-list">{zohoPreview.records?.length?zohoPreview.records.map(item=><article key={item.id}><div><strong>{item.name||'Unnamed JobSite'}</strong><p>{item.stage||'No stage'} · {item.closing_date||'No closing date'}</p></div></article>):<p>No JobSites returned in this first page.</p>}</div></div>}{error&&<p role="alert" className="error-message" style={{marginTop:12}}>{error}</p>}</section>}
   <section className="panel"><h2>Connections</h2><p className="muted">Setup is disabled until a secure provider connection is verified. Saving settings does not start synchronization.</p>
    {connections.length ? <div className="activity-list">{connections.map(item=><article key={item.id}><div><strong>{item.display_name}</strong><p>{PROVIDERS.find(([id])=>id===item.provider)?.[1]} · {item.direction.replaceAll('_',' ')} · {item.status.replaceAll('_',' ')}</p></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{canManage&&<><button type="button" className="secondary-button" onClick={()=>edit(item)}>Configure</button>{item.status==='connected'&&<button type="button" className="secondary-button" onClick={()=>pause(item)} disabled={busy}>Pause sync</button>}</>}</div></article>)}</div> : <p className="muted">No CRM or maintenance integrations configured.</p>}
   </section>
