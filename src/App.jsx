@@ -126,6 +126,12 @@ export default function App() {
     return () => { active = false; window.removeEventListener('online', sync) }
   }, [context])
 
+  const switchOrganization = (id) => {
+    if (!context?.organizations?.some(org => org.id === id)) return
+    window.localStorage.setItem('polyshield:selected-org:' + context.user.id, id)
+    window.location.reload()
+  }
+
   const navigate = (next) => {
     if (context && !canAccessView(context.role, next)) { flash('That tool is not available in your assigned workspace.'); setView('dashboard'); return }
     if (next !== 'assets') setAssetFilter(null)
@@ -164,6 +170,12 @@ export default function App() {
   const permissions = capabilitiesForRole(context.role)
 
   return <AppShell organizationName={context.organizationName} userEmail={context.user.email} role={context.role} active={active} onNavigate={navigate} onSignOut={() => supabase.auth.signOut()}>
+    {context.organizations?.length > 1 && <section className="panel" style={{marginBottom:12,padding:12}}>
+      <label>Active organization <select value={context.organizationId} onChange={e=>switchOrganization(e.target.value)}>
+        {context.organizations.map(org=><option key={org.id} value={org.id}>{org.name} — {org.role}</option>)}
+      </select></label>
+    </section>}
+    {view === 'integrations' && <p className="muted" style={{marginBottom:10}}>Active organization: {context.organizationName} · Your role: {context.role}</p>}
     {loading && <div className="loading-bar"/>}
     {fatalError && <div className="error-banner">{fatalError}<button onClick={() => refreshAll()}>Retry</button></div>}
     {view === 'projects' && <FieldProjects organizationId={context.organizationId} role={context.role} sites={sites} />}
