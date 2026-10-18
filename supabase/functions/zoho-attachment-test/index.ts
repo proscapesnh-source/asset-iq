@@ -21,8 +21,9 @@ Deno.serve(async req=>{
  if(item.status==='uploaded')return out({status:'uploaded',already_uploaded:true})
  if(!['pending','failed'].includes(item.status))return out({error:'Attachment is not ready for upload'},409)
  if(!['asset_photo','inspection_photo'].includes(item.source_type))return out({error:'Final PDF source support is not yet configured'},409)
- const {data:project}=await db.from('field_projects').select('zoho_record_id,site_id,organization_id').eq('id',item.project_id).eq('organization_id',organization_id).maybeSingle()
+ const {data:project}=await db.from('field_projects').select('zoho_record_id,site_id,organization_id,title').eq('id',item.project_id).eq('organization_id',organization_id).maybeSingle()
  if(!project?.zoho_record_id)return out({error:'Project has no linked Zoho JobSite'},409)
+ if(!String(project.title||'').startsWith('POLYSHIELD-ATTACHMENT-TEST-'))return out({error:'Test uploads are restricted to the dedicated PolyShield test JobSite'},403)
  const table=item.source_type==='asset_photo'?'asset_photos':'inspection_photos'
  const {data:photo}=await db.from(table).select('storage_path,organization_id,asset_id').eq('id',item.source_id).eq('organization_id',organization_id).maybeSingle()
  if(!photo||photo.storage_path!==item.storage_path)return out({error:'Photo source verification failed'},409)
