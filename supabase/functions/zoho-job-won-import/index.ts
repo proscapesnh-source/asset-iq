@@ -49,7 +49,7 @@ Deno.serve(async req=>{
    if(deals.error)return reply({error:'Zoho Deals: '+deals.error},502)
    const list=deals.data?.data||[]
    for(const deal of list){
-    if(String(deal.Stage||'').trim().toLowerCase()!=='job won')continue
+    if(String(deal.Stage||'').trim().toLowerCase()!=='purchase order received')continue
     if(!deal.id||!String(deal.Deal_Name||'').trim())continue
     found++
     matching.push({id:String(deal.id),name:String(deal.Deal_Name)})
@@ -69,6 +69,6 @@ Deno.serve(async req=>{
    if(!deals.data?.info?.more_records)break
    page++
   }while(page<=5)
-  return reply({created,existing,matched:found,scanned_pages:page,limited:page>5,failures,records:matching.slice(0,30),trigger_stage:'Job Won'})
- }catch(e){console.error('Zoho job won import failed',e instanceof Error?e.message:'unknown');return reply({error:'Zoho import failed; check logs.'},500)}
+  return reply({created,existing,matched:found,scanned_pages:page,limited:page>5,failures,records:matching.slice(0,30),trigger_stage:'Purchase Order Received'})
+ }catch(e){console.error('Zoho purchase order received import failed',e instanceof Error?e.message:'unknown');return reply({error:'Zoho import failed; check logs.'},500)}
 })
