@@ -22,14 +22,14 @@ Deno.serve(async request=>{
  if(!['https://www.zohoapis.com','https://zohoapis.com'].includes(cred.api_domain))return res({error:'Unsupported Zoho API region'},409)
  const marker='POLYSHIELD-ATTACHMENT-TEST-'+organization_id.slice(0,8)
  const list=await fetch('https://www.zohoapis.com/crm/v8/Deals/search?criteria='+encodeURIComponent('(Deal_Name:equals:'+marker+')'),{headers:{Authorization:'Zoho-oauthtoken '+cred.access_token}})
- const found=await list.json()
+ const found=list.status===204?{code:'NO_CONTENT'}:await list.json().catch(()=>({code:'INVALID_RESPONSE'}))
  if(list.ok&&found?.data?.length)return res({id:String(found.data[0].id),name:marker,existing:true})
  if(!list.ok&&list.status!==204&&found?.code!=='NO_CONTENT')return res({error:'Could not check for an existing test record. No changes made.',zoho_code:found?.code||null},502)
  const body={data:[{Deal_Name:marker,Stage:'Purchase Order Received',Description:'TEST ONLY — PolyShield integration validation. No customer, pricing, invoice, or real purchase order.'}],trigger:[]}
  const create=await fetch('https://www.zohoapis.com/crm/v8/Deals',{method:'POST',headers:{Authorization:'Zoho-oauthtoken '+cred.access_token,'Content-Type':'application/json'},body:JSON.stringify(body)})
- const result=await create.json()
+ const result=await create.json().catch(()=>({message:'Zoho returned a response without JSON'}))
  const first=result?.data?.[0]
- if(!create.ok||first?.code!=='SUCCESS'||!first?.details?.id)return res({error:'Zoho did not create the sample JobSite.',details:first?.message||result?.message||'Check required Deals fields and stage permissions.'},422)
+ if(!create.ok||first?.code!=='SUCCESS'||!first?.details?.id)return res({error:'Zoho did not create the sample JobSite.',details:first?.message||result?.message||'Check required Deals fields and stage permissions.',zoho_code:first?.code||result?.code||null},422)
  return res({id:String(first.details.id),name:marker,existing:false})
  }catch(e){console.error('Test jobsite creation failure',e instanceof Error?e.message:'unknown');return res({error:'Could not complete sample JobSite creation'},500)}
 })
