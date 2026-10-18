@@ -10,7 +10,7 @@ export default function ZohoAttachmentTools({organizationId,project}){
   if(qe)throw qe
   setQueue(q||[])
   if(!project.site_id){setPhotos([]);setAssets([]);return}
-  const {data:assets,error:ae}=await supabase.from('assets').select('id').eq('organization_id',organizationId).eq('site_id',project.site_id)
+  const {data:assets,error:ae}=await supabase.from('assets').select('id,name').eq('organization_id',organizationId).eq('site_id',project.site_id)
   if(ae)throw ae
   setAssets(assets||[])
   const ids=(assets||[]).map(a=>a.id)
