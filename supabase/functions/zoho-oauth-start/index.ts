@@ -26,7 +26,7 @@ Deno.serve(async(req)=>{
  const state=crypto.randomUUID()+crypto.randomUUID()
  const {error:e}=await db.from('zoho_oauth_states').insert({state,organization_id,user_id:user.id})
  if(e)throw e
- const params=new URLSearchParams({scope:'ZohoCRM.modules.deals.READ',client_id:clientId,response_type:'code',access_type:'offline',prompt:'consent',redirect_uri:base,state})
+ const params=new URLSearchParams({scope:'ZohoCRM.modules.deals.READ,ZohoCRM.modules.deals.CREATE,ZohoCRM.modules.attachments.CREATE',client_id:clientId,response_type:'code',access_type:'offline',prompt:'consent',redirect_uri:base,state})
  return json({url:'https://accounts.zoho.com/oauth/v2/auth?'+params.toString()})
  }catch(e){return json({error:e instanceof Error?e.message:'Unable to start connection'},500)}
 })
