@@ -20,6 +20,14 @@ export default function FieldProjects({ organizationId, role, sites = [] }) {
  const [message,setMessage] = useState('')
  const [busy,setBusy] = useState(false)
  const [syncResult,setSyncResult] = useState(null)
+ const [search,setSearch] = useState('')
+ const [statusFilter,setStatusFilter] = useState('all')
+ const visibleProjects = projects.filter(p => {
+  if(statusFilter !== 'all' && p.status !== statusFilter)return false
+  const siteName = sites.find(s=>s.id===p.site_id)?.name || ''
+  const haystack = [p.title,p.job_number,p.zoho_record_id,p.description,siteName].filter(Boolean).join(' ').toLowerCase()
+  return haystack.includes(search.trim().toLowerCase())
+ })
  const load = async () => {
   const [p,a,s] = await Promise.all([
    supabase.from('field_projects').select('*').eq('organization_id',organizationId).order('created_at',{ascending:false}),
@@ -62,8 +70,8 @@ export default function FieldProjects({ organizationId, role, sites = [] }) {
   {owner&&<section className="panel"><h2>Zoho CRM — Purchase Order Received</h2><p>Import JobSites with the exact stage <strong>Purchase Order Received</strong> into Owner Review. Existing Zoho IDs are skipped. Nothing is scheduled and no Zoho records are changed.</p><button type="button" className="primary-button" disabled={busy} onClick={syncWonJobs}>{busy?'Checking Zoho…':'Import Purchase Order Received projects'}</button>{syncResult&&<p role="status">{syncResult.matched} matching JobSites checked · {syncResult.created} imported · {syncResult.existing} already present{syncResult.failures?.length?' · '+syncResult.failures.length+' errors':''}</p>}</section>}
   {owner&&<form className="panel form-stack" onSubmit={create}><h2>Create project</h2><label>Project / jobsite name<input value={title} required onChange={e=>setTitle(e.target.value)}/></label><label>Job number<input value={jobNumber} onChange={e=>setJobNumber(e.target.value)}/></label><label>Jobsite<select value={site} onChange={e=>setSite(e.target.value)}><option value="">Not linked yet</option>{sites.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><button className="primary-button" disabled={busy}>Create for Owner review</button><p className="muted">Projects imported from Zoho appear above under Owner Review. You can also create test projects manually.</p></form>}
   {error&&<p role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
-  <section className="panel"><h2>{owner?'All corporate projects':'My assigned projects'}</h2>{!projects.length&&<p className="muted">No accessible projects yet.</p>}
-  <div className="activity-list">{projects.map(p=>{
+  <section className="panel"><h2>{owner?'All corporate projects':'My assigned projects'}</h2><div className="form-stack" style={{marginBottom:16}}><label>Search projects<input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Project, customer, job number, Zoho ID, jobsite" autoComplete="off" /></label><label>Project status<select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}><option value="all">All statuses</option><option value="owner_review">Owner Review</option><option value="work_scheduled">Work Scheduled</option><option value="active">Active</option><option value="submitted_for_close">Awaiting Close Approval</option><option value="closed">Closed</option></select></label><p className="muted" role="status">Showing {visibleProjects.length} of {projects.length} projects</p></div>{!projects.length&&<p className="muted">No accessible projects yet.</p>}
+  {projects.length>0&&visibleProjects.length===0&&<p className="muted">No projects match your search or status filter.</p>}<div className="activity-list">{visibleProjects.map(p=>{
    const assigned=assignments.filter(a=>a.project_id===p.id)
    const value=selection[p.id]||{role:'lead_supervisor',user:''}
    const options=staff.filter(s=>assignable(value.role,s.role))
