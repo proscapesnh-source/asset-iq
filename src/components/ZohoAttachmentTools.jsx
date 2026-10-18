@@ -1,24 +1,35 @@
-import {useEffect,useState} from 'react'
+import {useEffect,useRef,useState} from 'react'
+import {addAssetPhoto} from '../lib/data'
 import {supabase} from '../lib/supabase'
 export default function ZohoAttachmentTools({organizationId,project}){
+ const camera=useRef(null),library=useRef(null)
+ const [file,setFile]=useState(null),[preview,setPreview]=useState(''),[targetAsset,setTargetAsset]=useState(''),[assets,setAssets]=useState([])
  const [photos,setPhotos]=useState([]),[queue,setQueue]=useState([]),[photo,setPhoto]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('')
  const refresh=async()=>{
   const {data:q,error:qe}=await supabase.from('zoho_attachment_queue').select('id,source_id,file_name,status,last_error,zoho_attachment_id').eq('project_id',project.id).eq('organization_id',organizationId).order('created_at',{ascending:false})
   if(qe)throw qe
   setQueue(q||[])
-  if(!project.site_id){setPhotos([]);return}
-  const {data:assets,error:ae}=await supabase.from('assets').select('id').eq('organization_id',organizationId).eq('site_id',project.site_id)
+  if(!project.site_id){setPhotos([]);setAssets([]);return}
+  const {data:assets,error:ae}=await supabase.from('assets').select('id,name').eq('organization_id',organizationId).eq('site_id',project.site_id)
   if(ae)throw ae
+  setAssets(assets||[])
   const ids=(assets||[]).map(a=>a.id)
   if(!ids.length){setPhotos([]);return}
   const {data:p,error:pe}=await supabase.from('inspection_photos').select('id,file_name,asset_id').eq('organization_id',organizationId).in('asset_id',ids).limit(100)
   if(pe)throw pe
-  setPhotos(p||[])
+  const {data:assetPics,error:assetError}=await supabase.from('asset_photos').select('id,file_name,asset_id').eq('organization_id',organizationId).in('asset_id',ids).limit(100)
+  if(assetError)throw assetError
+  setPhotos([...(p||[]).map(x=>({...x,source:'inspection_photo'})),...(assetPics||[]).map(x=>({...x,source:'asset_photo'}))])
  }
  useEffect(()=>{refresh().catch(e=>setError(e.message))},[project.id,project.site_id])
  const act=async(fn)=>{setBusy(true);setError('');setMessage('');try{await fn();await refresh()}catch(e){setError(e.message||'Operation failed')}finally{setBusy(false)}}
+ const chooseFile=(event)=>{const selected=event.target.files?.[0];event.target.value='';if(!selected)return;if(!selected.type.startsWith('image/')){setError('Select an image file.');return}if(selected.size>18*1024*1024){setError('Photo must be under 18 MB.');return}if(preview)URL.revokeObjectURL(preview);setFile(selected);setPreview(URL.createObjectURL(selected));setError('')}
+ useEffect(()=>()=>{if(preview)URL.revokeObjectURL(preview)},[preview])
+ const savePhoto=()=>act(async()=>{const assetId=targetAsset||assets[0]?.id;if(!assetId||!file)throw Error('Choose a test asset and photo.');await addAssetPhoto(organizationId,assetId,file,'TEST ONLY - Zoho attachment validation',false);setFile(null);setPreview('');setMessage('Photo saved in PolyShield. Select it below to queue for Zoho.')})
  const queuePhoto=()=>act(async()=>{
-  const {error:e}=await supabase.rpc('queue_zoho_project_photo',{p_project:project.id,p_photo:photo,p_source:'inspection_photo'})
+  const selected=photos.find(x=>x.id===photo)
+  if(!selected)throw Error('Select a saved photo.')
+  const {error:e}=await supabase.rpc('queue_zoho_project_photo',{p_project:project.id,p_photo:photo,p_source:selected.source})
   if(e)throw e
   setMessage('Photo queued. No upload has occurred.')
  })
@@ -34,7 +45,8 @@ export default function ZohoAttachmentTools({organizationId,project}){
   <h3>Zoho attachments — controlled test</h3>
   <p className="muted">Only photos from assets linked to this project's jobsite are eligible. Test uploads change the Zoho JobSite, so use only a sample record.</p>
   {!project.site_id?<p>Link the project to a PolyShield jobsite before selecting attachments.</p>:<>
-   <label>Inspection photo <select value={photo} onChange={e=>setPhoto(e.target.value)}><option value="">Select a test photo</option>{photos.map(p=><option key={p.id} value={p.id}>{p.file_name||p.id}</option>)}</select></label>
+   <div className="form-stack"><strong>Add a test photo</strong><p className="muted">Choose or take a new photo, preview it, then save it to the sample asset before queuing to Zoho.</p><label>Test asset<select value={targetAsset||assets[0]?.id||''} onChange={e=>setTargetAsset(e.target.value)}>{assets.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></label><div className="section-actions"><button type="button" className="secondary-button" disabled={busy} onClick={()=>camera.current?.click()}>📷 Take Photo</button><button type="button" className="secondary-button" disabled={busy} onClick={()=>library.current?.click()}>▣ Choose From Library</button></div><input ref={camera} type="file" accept="image/*" capture="environment" onChange={chooseFile} style={{position:'absolute',width:1,height:1,opacity:0,pointerEvents:'none'}}/><input ref={library} type="file" accept="image/*" onChange={chooseFile} style={{position:'absolute',width:1,height:1,opacity:0,pointerEvents:'none'}}/>{preview&&<div><img src={preview} alt="Selected test photo" style={{maxWidth:260,width:'100%',borderRadius:8}}/><p>{file?.name}</p><button type="button" className="primary-button" disabled={busy} onClick={savePhoto}>Save to PolyShield</button></div>}</div>
+   <label>Previously saved photo <select value={photo} onChange={e=>setPhoto(e.target.value)}><option value="">Select a test photo</option>{photos.map(p=><option key={p.id} value={p.id}>{p.file_name||p.id} ({p.source==='asset_photo'?'Asset photo':'Inspection'})</option>)}</select></label>
    <button type="button" className="secondary-button" onClick={queuePhoto} disabled={busy||!photo}>Queue photo without uploading</button>
   </>}
   {queue.map(item=><div key={item.id} style={{padding:'10px 0',borderBottom:'1px solid #ddd'}}><strong>{item.file_name}</strong> · {item.status}
