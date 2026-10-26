@@ -11,6 +11,19 @@ export default function SiteVisitPlanner() {
  const [draft,setDraft] = useState({...blank})
  const [selected,setSelected] = useState(null)
  const [message,setMessage] = useState('')
+ const [aiReview,setAiReview] = useState(null)
+ const [aiBusy,setAiBusy] = useState(false)
+ const reviewWithAI = async () => {
+  if (!draft.photos.length) { setMessage('Add a site photo first.'); return }
+  setAiBusy(true)
+  try {
+   const response=await fetch('/api/analyze-site-visit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({site:{...draft,photos:[]},imageDataUrl:draft.photos[0].data})})
+   const body=await response.json()
+   if(!response.ok)throw new Error(body.error||'Review unavailable')
+   setAiReview(body.analysis)
+  }catch(error){setMessage(error.message)}
+  finally{setAiBusy(false)}
+ }
  const update=(field,value)=>setDraft(d=>({...d,[field]:value}))
  const area= draft.shape==='Cylinder' ? Math.PI*num(draft.diameter)*num(draft.height)+(draft.floor?Math.PI*num(draft.diameter)**2/4:0)+(draft.roof?Math.PI*num(draft.diameter)**2/4:0) : 2*(num(draft.length)+num(draft.width))*num(draft.height)+(draft.floor?num(draft.length)*num(draft.width):0)+(draft.roof?num(draft.length)*num(draft.width):0)
  const orderArea=area*(1+num(draft.waste)/100)
@@ -72,6 +85,12 @@ export default function SiteVisitPlanner() {
  <label>Inspection findings / scope notes<textarea value={draft.notes} rows={3} onChange={e=>update('notes',e.target.value)} /></label>
  <label>Site photographs (up to 8 small images)<input type="file" accept="image/*" capture="environment" multiple onChange={addPhotos}/></label>
  <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>{draft.photos.map((p,i)=><figure key={i} style={{width:100,margin:0}}><img src={p.data} alt={p.name} style={{width:100,height:80,objectFit:'cover'}}/><button type="button" onClick={()=>update('photos',draft.photos.filter((_,j)=>j!==i))}>Remove</button></figure>)}</div>
+ <section className="calculator-note"><h3>AI field assistant</h3>
+ <button type="button" disabled={aiBusy||!draft.photos.length} onClick={reviewWithAI}>{aiBusy?'Analyzing…':'Review photo and site survey with AI'}</button>
+ {aiReview&&<div><p>{aiReview.summary}</p>
+ {['observed','components','possible_concerns','next_questions'].map(key=><div key={key}><strong>{key.replaceAll('_',' ')}</strong><ul>{(aiReview[key]||[]).map((item,i)=><li key={i}>{item}</li>)}</ul></div>)}
+ <p>{aiReview.limitations}</p><small>AI findings require technician verification. Do not use photo estimates for dimensions or engineering approval.</small></div>}
+ </section>
  <div className="calculator-results"><div><small>Measured surface</small><strong>{Math.round(area).toLocaleString()} ft²</strong></div><div><small>Order coverage, including waste</small><strong>{Math.round(orderArea).toLocaleString()} ft²</strong></div><div><small>Durachem kits</small><strong>{kits===null?'TDS needed':kits}</strong></div><div><small>Draft estimate (entered costs)</small><strong>{kits===null?'Material estimate pending':dollars(subtotal)}</strong></div></div>
  <p className="muted">Estimate excludes taxes, mobilization, equipment, overhead and any unentered costs. Durachem field coverage is not thickness-adjusted until reference mils are defined. Other products require verified manufacturer coverage before kit estimates.</p>
  <div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:12}}><button type="button" className="primary-button" onClick={save}>Save site visit draft</button><button type="button" className="secondary-button" onClick={print} disabled={!readyForReview}>Print draft quote</button><button type="button" className="secondary-button" onClick={()=>{setDraft({...blank});setSelected(null);setMessage('New site visit started.')}}>New visit</button><button type="button" className="secondary-button" disabled title="Secure job-site sync endpoint is not yet available">Push job site to Zoho — setup required</button></div>
