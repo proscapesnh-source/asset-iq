@@ -16,6 +16,18 @@ export default function SiteVisitPlanner() {
  const orderArea=area*(1+num(draft.waste)/100)
  const kits=draft.material==='Durachem'?Math.ceil(orderArea/coverage[draft.substrate]):null
  const subtotal=num(draft.rate)*kits+num(draft.labor)
+ const checks=[
+  {label:'Identify the customer and site',done:!!draft.client.trim()&&!!draft.site.trim()&&!!draft.address.trim(),help:'Record customer, job-site name and full address.'},
+  {label:'Document the tank and scope',done:!!draft.scope.trim(),help:'Identify the tank, coating scope and surfaces included.'},
+  {label:'Verify physical measurements',done:draft.shape==='Cylinder'?num(draft.diameter)>0&&num(draft.height)>0:num(draft.length)>0&&num(draft.width)>0&&num(draft.height)>0,help:'Measure tank dimensions in feet; do not estimate dimensions from a photo alone.'},
+  {label:'Capture site photographs',done:draft.photos.length>0,help:'Photograph overall tank, access points, penetrations, repairs and areas needing special preparation.'},
+  {label:'Record inspection findings',done:!!draft.notes.trim(),help:'Document corrosion, seams, leaks, existing lining, surface preparation and restricted access.'},
+  {label:'Confirm material and thickness',done:!!draft.material.trim()&&num(draft.thickness)>0,help:'Verify selected product TDS and required application thickness.'},
+  {label:'Complete pricing inputs',done:num(draft.rate)>0&&draft.labor!==''&&kits!==null,help:'Enter verified package price and other costs; non-Durachem products require TDS coverage data.'}
+ ]
+ const incomplete=checks.filter(c=>!c.done)
+ const readyForReview=incomplete.length===0
+
  const save=()=>{if(!draft.client.trim()||!draft.site.trim()||!area){setMessage('Client, job site and valid dimensions are required.');return}
  const item={...draft,id:selected||('visit-'+Date.now()),updatedAt:new Date().toISOString(),status:'Draft — not sent to Zoho'}
  const next=[item,...drafts.filter(d=>d.id!==item.id)]
@@ -28,10 +40,18 @@ export default function SiteVisitPlanner() {
  if(data)results.push({name:file.name,data})}
  setDraft(d=>({...d,photos:[...d.photos,...results].slice(0,8)}));e.target.value=''
  }
- const print=()=>{if(!draft.client||!draft.site||!area){setMessage('Complete the visit details and dimensions before printing.');return}window.print()}
+ const print=()=>{if(!readyForReview){setMessage('Complete the survey checklist before printing a draft quote.');return}window.print()}
  return <section className="panel" id="site-visit-planner">
  <div className="section-header"><div><p className="eyebrow">Planning / field workflow</p><h2>Site visit → job-site quote</h2><p className="muted">Record a customer's site, document measurements and photos, prepare a material estimate and print a draft quote. Drafts remain on this device until shared storage and Zoho sync are configured.</p></div></div>
  {!!drafts.length&&<label>Resume site visit<select value={selected||''} onChange={e=>{const item=drafts.find(x=>x.id===e.target.value);if(item)load(item)}}><option value="">New site visit</option>{drafts.map(x=><option key={x.id} value={x.id}>{x.client} — {x.site}</option>)}</select></label>}
+ <section className="calculator-note" aria-label="Guided site survey review">
+ <h3>Guided field survey</h3>
+ <p>Follow each step. Missing items are flagged before a quote can be printed. A qualified estimator must approve the final scope, quantities and pricing.</p>
+ <p role="status"><strong>{checks.length-incomplete.length} of {checks.length} survey checks complete</strong> — {readyForReview?'Ready for estimator review':'More information needed'}</p>
+ <ol>{checks.map(c=><li key={c.label}><strong>{c.done?'✓':'○'} {c.label}</strong>{!c.done&&<span> — {c.help}</span>}</li>)}</ol>
+ <p><strong>Field prompts:</strong> Check interior versus exterior surfaces, roof and floor inclusion, substrate condition, bolts/welds, nozzles, manways, obstructions, access, containment, and environmental conditions. Flag uncertain conditions for supervisor review.</p>
+ <p className="muted">Photo recognition is not yet enabled. Photos provide evidence, but dimensions and material compatibility require human verification.</p>
+ </section>
  <div className="form-grid planner-inputs">
  <label>Customer / company<input value={draft.client} onChange={e=>update('client',e.target.value)}/></label>
  <label>Job-site name<input value={draft.site} onChange={e=>update('site',e.target.value)}/></label>
@@ -54,7 +74,7 @@ export default function SiteVisitPlanner() {
  <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>{draft.photos.map((p,i)=><figure key={i} style={{width:100,margin:0}}><img src={p.data} alt={p.name} style={{width:100,height:80,objectFit:'cover'}}/><button type="button" onClick={()=>update('photos',draft.photos.filter((_,j)=>j!==i))}>Remove</button></figure>)}</div>
  <div className="calculator-results"><div><small>Measured surface</small><strong>{Math.round(area).toLocaleString()} ft²</strong></div><div><small>Order coverage, including waste</small><strong>{Math.round(orderArea).toLocaleString()} ft²</strong></div><div><small>Durachem kits</small><strong>{kits===null?'TDS needed':kits}</strong></div><div><small>Draft estimate (entered costs)</small><strong>{kits===null?'Material estimate pending':dollars(subtotal)}</strong></div></div>
  <p className="muted">Estimate excludes taxes, mobilization, equipment, overhead and any unentered costs. Durachem field coverage is not thickness-adjusted until reference mils are defined. Other products require verified manufacturer coverage before kit estimates.</p>
- <div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:12}}><button type="button" className="primary-button" onClick={save}>Save site visit draft</button><button type="button" className="secondary-button" onClick={print}>Print draft quote</button><button type="button" className="secondary-button" onClick={()=>{setDraft({...blank});setSelected(null);setMessage('New site visit started.')}}>New visit</button><button type="button" className="secondary-button" disabled title="Secure job-site sync endpoint is not yet available">Push job site to Zoho — setup required</button></div>
+ <div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:12}}><button type="button" className="primary-button" onClick={save}>Save site visit draft</button><button type="button" className="secondary-button" onClick={print} disabled={!readyForReview}>Print draft quote</button><button type="button" className="secondary-button" onClick={()=>{setDraft({...blank});setSelected(null);setMessage('New site visit started.')}}>New visit</button><button type="button" className="secondary-button" disabled title="Secure job-site sync endpoint is not yet available">Push job site to Zoho — setup required</button></div>
  {message&&<p role="status">{message}</p>}
  </section>
 }
