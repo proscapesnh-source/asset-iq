@@ -6,6 +6,29 @@ const blank = { client:'',site:'',address:'',contact:'',scope:'',shape:'Cylinder
 const coverage = { concrete:800,bolted:850,welded:1100 }
 const num = x => Math.max(0, Number(x) || 0)
 const dollars = n => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n)
+const MEDIA_GUIDANCE = {
+ garnet: {name:'Garnet',detail:'Candidate for controlled profiling and coating removal; verify grade, achievable profile, dust controls, consumption and production by test blast.'},
+ coal_slag: {name:'Coal slag',detail:'Candidate for approved open-blast applications; evaluate dust, possible constituent exposure, spent-media disposal and achieved profile.'},
+ copper_slag: {name:'Copper slag',detail:'Candidate where approved and available; evaluate dust/metals exposure, disposal classification, achieved profile and test-blast productivity.'}
+}
+function mediaAdvice(condition, ai) {
+ const text = [ai?.summary,...(ai?.observed||[]),...(ai?.possible_concerns||[])].filter(Boolean).join(' ').toLowerCase()
+ const hazard = condition==='hazardous' || /lead|chromat|hazardous coating|asbestos/.test(text)
+ const coating = condition==='unknown' ? (/(blister|peel|flak|delaminat|rust|corrosion)/.test(text)?'thin':'unknown') : condition
+ const detail = hazard
+  ? 'Do not choose abrasive from photographs. Stop pending coating identification, exposure assessment, containment and waste controls.'
+  : coating==='heavy'
+  ? 'Heavy adherent coating: test-blast garnet and any permitted slag media at the required profile; rank by achieved removal rate, consumption and total cost.'
+  : coating==='concrete'
+  ? 'Concrete: confirm specified surface preparation and concrete soundness; abrasive type and method require test patches and coating-system approval.'
+  : coating==='bare'
+  ? 'Bare steel or mill scale: select media grade to achieve the specified cleanliness and anchor profile, then verify with test panels.'
+  : coating==='thin'
+  ? 'Deteriorated coating: compare removal rate and required profile during a test blast; garnet is a starting candidate, not an automatic winner.'
+  : 'Coating type is unverified. Obtain coating history and test results before ranking abrasive productivity.'
+ return {hazard,coating,detail}
+}
+
 export default function SiteVisitPlanner() {
  const [drafts,setDrafts] = useState(read)
  const [draft,setDraft] = useState({...blank})
@@ -31,6 +54,7 @@ export default function SiteVisitPlanner() {
  const subtotal=num(draft.rate)*kits+num(draft.labor)
  const blastingHours=num(draft.blastRate)>0?area/num(draft.blastRate):null
  const mediaWeight=num(draft.mediaLbsPerSqFt)>0?area*num(draft.mediaLbsPerSqFt)*(1+num(draft.mediaWaste)/100):null
+ const advice=mediaAdvice(draft.existingCoating,aiReview)
  const checks=[
   {label:'Identify the customer and site',done:!!draft.client.trim()&&!!draft.site.trim()&&!!draft.address.trim(),help:'Record customer, job-site name and full address.'},
   {label:'Document the tank and scope',done:!!draft.scope.trim(),help:'Identify the tank, coating scope and surfaces included.'},
@@ -82,6 +106,14 @@ export default function SiteVisitPlanner() {
  <label>Field-approved abrasive consumption (lb/ft²)<input type="number" min="0" step="0.1" value={draft.mediaLbsPerSqFt||''} onChange={e=>update('mediaLbsPerSqFt',e.target.value)} placeholder="Enter manufacturer / test-blast rate"/></label>
  <label>Abrasive allowance (%)<input type="number" min="0" value={draft.mediaWaste??'10'} onChange={e=>update('mediaWaste',e.target.value)}/></label>
  <p className="muted">Calculated abrasive required: {mediaWeight===null?'Enter a verified consumption rate':Math.ceil(mediaWeight).toLocaleString()+' lb ('+(mediaWeight/2000).toFixed(2)+' US short tons)'}. Media consumption is based on measured preparation area, not coating order coverage. Evaluate existing coating, target profile, blast standard, nozzle and pressure, access, containment, worker exposure, and test-blast results before comparing productivity.</p>
+ <section className="calculator-note" aria-label="Abrasive media recommendations">
+ <h3>AI-assisted abrasive selection</h3>
+ <p><strong>Provisional field guidance:</strong> {advice.detail}</p>
+ <p><strong>Interpretation:</strong> {draft.existingCoating==='unknown'&&advice.coating!=='unknown'?'Visual observations suggest deterioration; a technician must confirm coating type.':'Uses technician-selected coating condition and any available AI site findings.'}</p>
+ <p><strong>Comparison candidates:</strong></p>
+ <ul>{Object.entries(MEDIA_GUIDANCE).map(([id,entry])=><li key={id}><strong>{entry.name}{draft.blastMedia===id?' (selected)':''}:</strong> {entry.detail}</li>)}</ul>
+ <p>{advice.hazard?'Potential hazardous coating: abrasive recommendation is on hold.':'No media is declared best until the required cleanliness and profile, hazard review, test-blast rate (ft²/hour), consumption (lb/ft²), cost and waste handling are verified.'}</p>
+ </section>
  <label>Blast method / surface preparation<input value={draft.blastMethod||''} onChange={e=>update('blastMethod',e.target.value)} placeholder="Enter specified preparation method"/></label>
  <label>Approved blast production rate (ft²/hour)<input type="number" min="0" value={draft.blastRate||''} onChange={e=>update('blastRate',e.target.value)} placeholder="Enter field-approved rate"/></label>
  <p className="muted">Blasting quantities use physical surface area and the entered field production rate—not AI judgment. {blastingHours!==null?'Calculated blast production hours: '+blastingHours.toFixed(1)+' (excludes setup, containment, cleanup and other allowances).':'Enter a field-approved production rate to calculate blasting hours.'}</p>
