@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 const KEY = 'polyshield_site_visit_drafts_v1'
 const read = () => { try { return JSON.parse(localStorage.getItem(KEY) || '[]') } catch { return [] } }
-const blank = { client:'',site:'',address:'',contact:'',scope:'',shape:'Cylinder',diameter:'',height:'',length:'',width:'',floor:true,roof:false,material:'Durachem',substrate:'concrete',thickness:'100',waste:'20',rate:'',labor:'',notes:'',photos:[] }
+const blank = { client:'',site:'',address:'',contact:'',scope:'',shape:'Cylinder',diameter:'',height:'',length:'',width:'',floor:true,roof:false,material:'Durachem',substrate:'concrete',thickness:'100',waste:'20',rate:'',labor:'',notes:'',photos:[],dimensionsVerified:false,blastMethod:'',blastRate:'' }
 const coverage = { concrete:800,bolted:850,welded:1100 }
 const num = x => Math.max(0, Number(x) || 0)
 const dollars = n => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n)
@@ -24,15 +24,16 @@ export default function SiteVisitPlanner() {
   }catch(error){setMessage(error.message)}
   finally{setAiBusy(false)}
  }
- const update=(field,value)=>setDraft(d=>({...d,[field]:value}))
+ const update=(field,value)=>setDraft(d=>({...d,[field]:value,...(['diameter','height','length','width'].includes(field)?{dimensionsVerified:false}:{})}))
  const area= draft.shape==='Cylinder' ? Math.PI*num(draft.diameter)*num(draft.height)+(draft.floor?Math.PI*num(draft.diameter)**2/4:0)+(draft.roof?Math.PI*num(draft.diameter)**2/4:0) : 2*(num(draft.length)+num(draft.width))*num(draft.height)+(draft.floor?num(draft.length)*num(draft.width):0)+(draft.roof?num(draft.length)*num(draft.width):0)
  const orderArea=area*(1+num(draft.waste)/100)
  const kits=draft.material==='Durachem'?Math.ceil(orderArea/coverage[draft.substrate]):null
  const subtotal=num(draft.rate)*kits+num(draft.labor)
+ const blastingHours=num(draft.blastRate)>0?area/num(draft.blastRate):null
  const checks=[
   {label:'Identify the customer and site',done:!!draft.client.trim()&&!!draft.site.trim()&&!!draft.address.trim(),help:'Record customer, job-site name and full address.'},
   {label:'Document the tank and scope',done:!!draft.scope.trim(),help:'Identify the tank, coating scope and surfaces included.'},
-  {label:'Verify physical measurements',done:draft.shape==='Cylinder'?num(draft.diameter)>0&&num(draft.height)>0:num(draft.length)>0&&num(draft.width)>0&&num(draft.height)>0,help:'Measure tank dimensions in feet; do not estimate dimensions from a photo alone.'},
+  {label:'Verify physical measurements',done:!!draft.dimensionsVerified&&(draft.shape==='Cylinder'?num(draft.diameter)>0&&num(draft.height)>0:num(draft.length)>0&&num(draft.width)>0&&num(draft.height)>0),help:'Measure tank dimensions in feet; do not estimate dimensions from a photo alone.'},
   {label:'Capture site photographs',done:draft.photos.length>0,help:'Photograph overall tank, access points, penetrations, repairs and areas needing special preparation.'},
   {label:'Record inspection findings',done:!!draft.notes.trim(),help:'Document corrosion, seams, leaks, existing lining, surface preparation and restricted access.'},
   {label:'Confirm material and thickness',done:!!draft.material.trim()&&num(draft.thickness)>0,help:'Verify selected product TDS and required application thickness.'},
@@ -63,7 +64,7 @@ export default function SiteVisitPlanner() {
  <p role="status"><strong>{checks.length-incomplete.length} of {checks.length} survey checks complete</strong> — {readyForReview?'Ready for estimator review':'More information needed'}</p>
  <ol>{checks.map(c=><li key={c.label}><strong>{c.done?'✓':'○'} {c.label}</strong>{!c.done&&<span> — {c.help}</span>}</li>)}</ol>
  <p><strong>Field prompts:</strong> Check interior versus exterior surfaces, roof and floor inclusion, substrate condition, bolts/welds, nozzles, manways, obstructions, access, containment, and environmental conditions. Flag uncertain conditions for supervisor review.</p>
- <p className="muted">Photo recognition is not yet enabled. Photos provide evidence, but dimensions and material compatibility require human verification.</p>
+ <p className="muted">AI identifies visible features and asks follow-up questions. The technician must physically confirm dimensions before quoting; surface preparation and production are rule-based inputs, not AI decisions.</p>
  </section>
  <div className="form-grid planner-inputs">
  <label>Customer / company<input value={draft.client} onChange={e=>update('client',e.target.value)}/></label>
@@ -74,6 +75,10 @@ export default function SiteVisitPlanner() {
  <label>Tank shape<select value={draft.shape} onChange={e=>update('shape',e.target.value)}><option>Cylinder</option><option>Rectangular</option></select></label>
  {draft.shape==='Cylinder'?<label>Diameter (ft)<input type="number" min="0" value={draft.diameter} onChange={e=>update('diameter',e.target.value)}/></label>:<><label>Length (ft)<input type="number" min="0" value={draft.length} onChange={e=>update('length',e.target.value)}/></label><label>Width (ft)<input type="number" min="0" value={draft.width} onChange={e=>update('width',e.target.value)}/></label></>}
  <label>Height (ft)<input type="number" min="0" value={draft.height} onChange={e=>update('height',e.target.value)}/></label>
+ <label><input type="checkbox" checked={!!draft.dimensionsVerified} onChange={e=>update('dimensionsVerified',e.target.checked)}/> I physically checked the dimensions against the AI/site-photo assessment</label>
+ <label>Blast method / surface preparation<input value={draft.blastMethod||''} onChange={e=>update('blastMethod',e.target.value)} placeholder="Enter specified preparation method"/></label>
+ <label>Approved blast production rate (ft²/hour)<input type="number" min="0" value={draft.blastRate||''} onChange={e=>update('blastRate',e.target.value)} placeholder="Enter field-approved rate"/></label>
+ <p className="muted">Blasting quantities use physical surface area and the entered field production rate—not AI judgment. {blastingHours!==null?'Calculated blast production hours: '+blastingHours.toFixed(1)+' (excludes setup, containment, cleanup and other allowances).':'Enter a field-approved production rate to calculate blasting hours.'}</p>
  <label>Coating / material<input value={draft.material} onChange={e=>update('material',e.target.value)} /></label>
  {draft.material==='Durachem'&&<label>Tank substrate<select value={draft.substrate} onChange={e=>update('substrate',e.target.value)}><option value="concrete">Concrete — 800 ft²/kit</option><option value="bolted">Bolted steel — 850 ft²/kit</option><option value="welded">Welded steel — 1,100 ft²/kit</option></select></label>}
  <label>Thickness (mils)<input type="number" min="1" value={draft.thickness} onChange={e=>update('thickness',e.target.value)}/></label>
