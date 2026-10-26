@@ -35,7 +35,7 @@ export default function AppShell({ organizationName, userEmail, role, active, on
   ]
   const allowed = allowedViews(role)
   const items = allItems.filter(([id]) => allowed.includes(id))
-  const primaryIds = ['dashboard', 'assets', 'site-training', ...(allowed.includes('inspect') ? ['inspect'] : allowed.includes('work') ? ['work'] : [])]
+  const primaryIds = ['dashboard', ...(allowed.includes('planning') ? ['planning'] : []), 'site-training', ...(allowed.includes('inspect') ? ['inspect'] : allowed.includes('work') ? ['work'] : [])]
   const primaryItems = items.filter(([id]) => primaryIds.includes(id)).slice(0, 4)
   const moreItems = items.filter(([id]) => !primaryItems.some(([primaryId]) => primaryId === id))
   const onNav = id => { setShowMore(false); onNavigate(id) }
