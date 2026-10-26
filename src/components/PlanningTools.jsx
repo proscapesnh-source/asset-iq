@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import SiteVisitPlanner from './SiteVisitPlanner'
 
 const number = (value) => Math.max(0, Number(value) || 0)
 const DURACHEM_COVERAGE = Object.freeze({ concrete: 800, bolted: 850, welded: 1100 })
@@ -82,6 +83,7 @@ export default function PlanningTools({ workOrders = [], role }) {
   const canViewBudget = ['owner', 'admin', 'manager', 'supervisor'].includes(role)
 
   return <div className="page-stack">
+    <SiteVisitPlanner />
     <div className="page-heading"><div><p className="eyebrow">Field estimating + capital planning</p><h1>Planning tools</h1><p>Turn vessel dimensions into coating quantities, then connect identified work to budget and purchase-order progress.</p></div></div>
 
     <section className="planner-grid">
