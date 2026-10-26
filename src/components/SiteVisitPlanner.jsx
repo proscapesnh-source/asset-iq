@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 const KEY = 'polyshield_site_visit_drafts_v1'
 const read = () => { try { return JSON.parse(localStorage.getItem(KEY) || '[]') } catch { return [] } }
-const blank = { client:'',site:'',address:'',contact:'',scope:'',shape:'Cylinder',diameter:'',height:'',length:'',width:'',floor:true,roof:false,material:'Durachem',substrate:'concrete',thickness:'100',waste:'20',rate:'',labor:'',notes:'',photos:[],dimensionsVerified:false,blastMethod:'',blastRate:'' }
+const blank = { client:'',site:'',address:'',contact:'',scope:'',shape:'Cylinder',diameter:'',height:'',length:'',width:'',floor:true,roof:false,material:'Durachem',substrate:'concrete',thickness:'100',waste:'20',rate:'',labor:'',notes:'',photos:[],dimensionsVerified:false,blastMethod:'',blastRate:'',blastMedia:'garnet',mediaLbsPerSqFt:'',mediaWaste:'10',existingCoating:'unknown' }
 const coverage = { concrete:800,bolted:850,welded:1100 }
 const num = x => Math.max(0, Number(x) || 0)
 const dollars = n => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n)
@@ -30,6 +30,7 @@ export default function SiteVisitPlanner() {
  const kits=draft.material==='Durachem'?Math.ceil(orderArea/coverage[draft.substrate]):null
  const subtotal=num(draft.rate)*kits+num(draft.labor)
  const blastingHours=num(draft.blastRate)>0?area/num(draft.blastRate):null
+ const mediaWeight=num(draft.mediaLbsPerSqFt)>0?area*num(draft.mediaLbsPerSqFt)*(1+num(draft.mediaWaste)/100):null
  const checks=[
   {label:'Identify the customer and site',done:!!draft.client.trim()&&!!draft.site.trim()&&!!draft.address.trim(),help:'Record customer, job-site name and full address.'},
   {label:'Document the tank and scope',done:!!draft.scope.trim(),help:'Identify the tank, coating scope and surfaces included.'},
@@ -76,6 +77,11 @@ export default function SiteVisitPlanner() {
  {draft.shape==='Cylinder'?<label>Diameter (ft)<input type="number" min="0" value={draft.diameter} onChange={e=>update('diameter',e.target.value)}/></label>:<><label>Length (ft)<input type="number" min="0" value={draft.length} onChange={e=>update('length',e.target.value)}/></label><label>Width (ft)<input type="number" min="0" value={draft.width} onChange={e=>update('width',e.target.value)}/></label></>}
  <label>Height (ft)<input type="number" min="0" value={draft.height} onChange={e=>update('height',e.target.value)}/></label>
  <label><input type="checkbox" checked={!!draft.dimensionsVerified} onChange={e=>update('dimensionsVerified',e.target.checked)}/> I physically checked the dimensions against the AI/site-photo assessment</label>
+ <label>Existing coating condition / type<select value={draft.existingCoating||'unknown'} onChange={e=>update('existingCoating',e.target.value)}><option value="unknown">Unknown — field verification required</option><option value="bare">Bare steel / mill scale</option><option value="thin">Thin, aged or deteriorated coating</option><option value="heavy">Heavy or strongly adhered coating</option><option value="concrete">Concrete substrate / surface preparation</option><option value="hazardous">Potential hazardous or lead-containing coating — testing required</option></select></label>
+ <label>Blast media<select value={draft.blastMedia||'garnet'} onChange={e=>update('blastMedia',e.target.value)}><option value="garnet">Garnet</option><option value="coal_slag">Coal slag</option><option value="copper_slag">Copper slag</option></select></label>
+ <label>Field-approved abrasive consumption (lb/ft²)<input type="number" min="0" step="0.1" value={draft.mediaLbsPerSqFt||''} onChange={e=>update('mediaLbsPerSqFt',e.target.value)} placeholder="Enter manufacturer / test-blast rate"/></label>
+ <label>Abrasive allowance (%)<input type="number" min="0" value={draft.mediaWaste??'10'} onChange={e=>update('mediaWaste',e.target.value)}/></label>
+ <p className="muted">Calculated abrasive required: {mediaWeight===null?'Enter a verified consumption rate':Math.ceil(mediaWeight).toLocaleString()+' lb ('+(mediaWeight/2000).toFixed(2)+' US short tons)'}. Media consumption is based on measured preparation area, not coating order coverage. Evaluate existing coating, target profile, blast standard, nozzle and pressure, access, containment, worker exposure, and test-blast results before comparing productivity.</p>
  <label>Blast method / surface preparation<input value={draft.blastMethod||''} onChange={e=>update('blastMethod',e.target.value)} placeholder="Enter specified preparation method"/></label>
  <label>Approved blast production rate (ft²/hour)<input type="number" min="0" value={draft.blastRate||''} onChange={e=>update('blastRate',e.target.value)} placeholder="Enter field-approved rate"/></label>
  <p className="muted">Blasting quantities use physical surface area and the entered field production rate—not AI judgment. {blastingHours!==null?'Calculated blast production hours: '+blastingHours.toFixed(1)+' (excludes setup, containment, cleanup and other allowances).':'Enter a field-approved production rate to calculate blasting hours.'}</p>
