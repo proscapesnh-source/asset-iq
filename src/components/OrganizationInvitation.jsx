@@ -30,7 +30,7 @@ export default function OrganizationInvitation({ token, onDone }) {
       if (!user) throw new Error('Sign in with the email address that received this invitation.')
       const { error: acceptError } = await supabase.rpc('accept_org_invitation', { p_token: token })
       if (acceptError) throw acceptError
-      setMessage('Invitation accepted. Your supervisor can now approve your technician access.')
+      setMessage('Request sent. Your supervisor can now approve you.')
     } catch (err) {
       const detail = err.message || 'Unable to accept invitation.'
       if (/Invitation unavailable|Already a member/i.test(detail)) setStaleLink(true)
@@ -57,15 +57,15 @@ export default function OrganizationInvitation({ token, onDone }) {
   }
 
   return <main className="setup-error"><section>
-    <h1>PolyShield organization invitation</h1>
-    <p>Sign in with the email address used for this invitation. After acceptance, a supervisor must approve access.</p>
+    <h1>Join your crew</h1>
+    <p>Use the email your supervisor invited. Tap Join Crew below. Your supervisor will approve access next.</p>
     {accountEmail && <p><strong>Signed in as:</strong> {accountEmail}</p>}
     {error && <p role="alert" className="error-message">{error}</p>}
     {message && <p role="status">{message}</p>}
     <button type="button" className="primary-button" disabled={busy || !!message} onClick={accept}>
-      {busy ? 'Checking invitation…' : 'Accept invitation'}
+      {busy ? 'Checking invitation…' : 'JOIN CREW'}
     </button>
-    <button type="button" className="secondary-button" disabled={busy || (!message && !staleLink)} onClick={onDone}>{staleLink ? 'Open my workspace' : 'Continue to PolyShield'}</button>
-    {!message && <button type="button" className="secondary-button" disabled={busy} onClick={switchAccount}>Sign in with a different email</button>}
+    <button type="button" className="secondary-button" disabled={busy || (!message && !staleLink)} onClick={onDone}>{staleLink ? 'Go to my jobs' : 'Continue to PolyShield'}</button>
+    {!message && <button type="button" className="secondary-button" disabled={busy} onClick={switchAccount}>Wrong email? Switch account</button>}
   </section></main>
 }
