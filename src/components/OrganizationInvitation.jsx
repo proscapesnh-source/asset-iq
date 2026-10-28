@@ -6,6 +6,7 @@ export default function OrganizationInvitation({ token, onDone }) {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [accountEmail, setAccountEmail] = useState('')
+  const [staleLink, setStaleLink] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -22,6 +23,7 @@ export default function OrganizationInvitation({ token, onDone }) {
     setBusy(true)
     setError('')
     setMessage('')
+    setStaleLink(false)
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser()
       if (authError) throw authError
@@ -31,6 +33,7 @@ export default function OrganizationInvitation({ token, onDone }) {
       setMessage('Invitation accepted. Your supervisor can now approve your technician access.')
     } catch (err) {
       const detail = err.message || 'Unable to accept invitation.'
+      if (/Invitation unavailable|Already a member/i.test(detail)) setStaleLink(true)
       setError(detail.includes('another email address')
         ? 'You are signed into a different email. Sign out and sign in with the email that received this invitation.'
         : detail)
@@ -62,7 +65,7 @@ export default function OrganizationInvitation({ token, onDone }) {
     <button type="button" className="primary-button" disabled={busy || !!message} onClick={accept}>
       {busy ? 'Checking invitation…' : 'Accept invitation'}
     </button>
-    <button type="button" className="secondary-button" disabled={busy || !message} onClick={onDone}>Continue to PolyShield</button>
+    <button type="button" className="secondary-button" disabled={busy || (!message && !staleLink)} onClick={onDone}>{staleLink ? 'Open my workspace' : 'Continue to PolyShield'}</button>
     {!message && <button type="button" className="secondary-button" disabled={busy} onClick={switchAccount}>Sign in with a different email</button>}
   </section></main>
 }
