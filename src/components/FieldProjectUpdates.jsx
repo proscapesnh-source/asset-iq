@@ -70,7 +70,7 @@ export default function FieldProjectUpdates({ organizationId, project }) {
         <div style={{display:'flex',gap:10,flexWrap:'wrap'}}><button type="button" className={entryMode==='photo'?'primary-button':'secondary-button'} onClick={()=>setEntryMode('photo')}>📷 TAKE PHOTO</button><button type="button" className={entryMode==='note'?'primary-button':'secondary-button'} onClick={()=>{setEntryMode('note');setFile(null)}}>✏️ ADD NOTE</button></div>
         {entryMode==='photo' && <label>Photo (optional)<input ref={fileInput} type="file" accept="image/*" capture="environment" onChange={e => setFile(e.target.files?.[0] || null)} /></label>}
         <label>What did you do? (optional with photo)<textarea maxLength={1500} value={note} onChange={e => setNote(e.target.value)} placeholder="Describe the condition or work completed" /></label>
-        <button className="primary-button" disabled={busy || (!file && !note.trim())}>{busy ? 'Saving…' : ''Save update'}</button>
+        <button className="primary-button" disabled={busy || (!file && !note.trim())}>{busy ? 'Saving…' : 'Save update'}</button>
       </form>}
     {error && <p role="alert" className="error-message">{error}</p>}
     {feedback && <p role="status">{feedback}</p>}
