@@ -1,3 +1,4 @@
+import FieldProjectUpdates from './FieldProjectUpdates'
 import ZohoAttachmentTools from './ZohoAttachmentTools'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
@@ -9,6 +10,7 @@ const assignable = (role, memberRole) => role === 'lead_supervisor' || role === 
 
 export default function FieldProjects({ organizationId, role, sites = [] }) {
  const owner = ['owner','admin'].includes(role)
+ const technician = ['technician','inspector'].includes(role)
  const [projects,setProjects] = useState([])
  const [assignments,setAssignments] = useState([])
  const [staff,setStaff] = useState([])
@@ -83,11 +85,12 @@ export default function FieldProjects({ organizationId, role, sites = [] }) {
     <button type="button" className="secondary-button" disabled={busy||!value.user} onClick={()=>assign(p)}>Assign employee</button>
    </div>}
    {owner&&p.zoho_record_id&&<label>Linked PolyShield jobsite<select value={p.site_id||''} disabled={busy} onChange={e=>linkSite(p,e.target.value)}><option value="">Select jobsite</option>{sites.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>}
+   {technician&&p.status==='active'&&<FieldProjectUpdates organizationId={organizationId} project={p} />}
    {owner&&p.zoho_record_id&&<ZohoAttachmentTools organizationId={organizationId} project={p} />}
    <div className="section-actions" style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:12}}>
    {owner&&p.status==='owner_review'&&<button className="primary-button" disabled={busy} onClick={()=>transition(p,'work_scheduled')}>Move to Work Scheduled</button>}
    {owner&&p.status==='work_scheduled'&&<button className="primary-button" disabled={busy} onClick={()=>transition(p,'active')}>Start project</button>}
-   {p.status==='active'&&<button className="secondary-button" disabled={busy} onClick={()=>transition(p,'submitted_for_close')}>Submit completion</button>}
+   {owner&&p.status==='active'&&<button className="secondary-button" disabled={busy} onClick={()=>transition(p,'submitted_for_close')}>Submit completion</button>}
    {owner&&p.status==='submitted_for_close'&&<button className="primary-button" disabled={busy} onClick={()=>transition(p,'closed')}>Approve and close — revoke crew access</button>}
    {owner&&p.status==='closed'&&<button className="secondary-button" disabled={busy} onClick={()=>transition(p,'owner_review')}>Reopen for Owner review</button>}
    </div>
