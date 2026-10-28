@@ -15,10 +15,10 @@ const managers = ['owner','admin','manager','supervisor']
 const fmt = value => value ? new Date(value).toLocaleString() : 'Active'
 const hours = row => ((new Date(row.clock_out_at || Date.now()) - new Date(row.clock_in_at))/3600000).toFixed(2)
 
-export default function TimeClock({ organizationId, role, sites=[] }) {
+export default function TimeClock({ organizationId, role, sites=[], defaultSiteId='' }) {
  const manager = managers.includes(role)
  const [rows,setRows] = useState([])
- const [site,setSite] = useState('')
+ const [site,setSite] = useState(defaultSiteId)
  const [type,setType] = useState('job')
  const [note,setNote] = useState('')
  const [busy,setBusy] = useState(false)
