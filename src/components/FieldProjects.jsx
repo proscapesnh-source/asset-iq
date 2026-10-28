@@ -13,6 +13,8 @@ export default function FieldProjects({ organizationId, role, sites = [] }) {
  const owner = ['owner','admin'].includes(role)
  const technician = ['technician','inspector'].includes(role)
  const [projects,setProjects] = useState([])
+ const [activeWorkspace,setActiveWorkspace] = useState('')
+ const [photoReminderDismissed,setPhotoReminderDismissed] = useState(false)
  const [assignments,setAssignments] = useState([])
  const [staff,setStaff] = useState([])
  const [title,setTitle] = useState('')
@@ -68,6 +70,20 @@ export default function FieldProjects({ organizationId, role, sites = [] }) {
   setMessage('Assignment saved.')
  })
  const transition=(p,status)=>act(async()=>{await rpc('transition_field_project',{p_project:p.id,p_status:status});setMessage('Project status updated.')})
+ const openProject = projects.find(p => p.id === activeWorkspace && p.status === 'active')
+ if (openProject) return <div className="page-stack">
+  <div className="page-heading"><div><p className="eyebrow">Active jobsite · {openProject.job_number || 'Field work'}</p><h1>{openProject.title}</h1><p>Field workspace for the duration of this project</p></div></div>
+  <button type="button" className="secondary-button" onClick={()=>{setActiveWorkspace('');setPhotoReminderDismissed(false)}}>Back to all projects</button>
+  <section className="panel" role="status">
+   <h2>Start-of-shift checklist</h2>
+   <p><strong>Clock-in reminder:</strong> Check your time clock below at the start of each shift. If you are not already clocked in, choose this jobsite and clock in.</p>
+   {!photoReminderDismissed && <p><strong>Photo reminder:</strong> Document existing conditions before work, then progress and completed areas. Add a note even if you do not have a photo.</p>}
+   {!photoReminderDismissed && <button type="button" className="secondary-button" onClick={()=>setPhotoReminderDismissed(true)}>Dismiss photo reminder</button>}
+  </section>
+  <section id="jobsite-clock" className="panel"><h2>Clock in / out</h2><TimeClock organizationId={organizationId} role={role} sites={sites.filter(s=>s.id===openProject.site_id)} defaultSiteId={openProject.site_id}/></section>
+  <div id="jobsite-updates"><FieldProjectUpdates organizationId={organizationId} project={openProject}/></div>
+  <p className="muted">Notes and photos save to this site's asset in PolyShield. Zoho synchronization has not been verified.</p>
+ </div>
  return <div className="page-stack">
   <div className="page-heading"><div><p className="eyebrow">Corporate project workflow</p><h1>Projects</h1><p>Owner review, supervisor assignment, scheduling, and controlled closure.</p></div></div>
   {owner&&<section className="panel"><h2>Zoho CRM — Purchase Order Received</h2><p>Import JobSites with the exact stage <strong>Purchase Order Received</strong> into Owner Review. Existing Zoho IDs are skipped. Nothing is scheduled and no Zoho records are changed.</p><button type="button" className="primary-button" disabled={busy} onClick={syncWonJobs}>{busy?'Checking Zoho…':'Import Purchase Order Received projects'}</button>{syncResult&&<p role="status">{syncResult.matched} matching JobSites checked · {syncResult.created} imported · {syncResult.existing} already present{syncResult.failures?.length?' · '+syncResult.failures.length+' errors':''}</p>}</section>}
@@ -86,7 +102,8 @@ export default function FieldProjects({ organizationId, role, sites = [] }) {
     <button type="button" className="secondary-button" disabled={busy||!value.user} onClick={()=>assign(p)}>Assign employee</button>
    </div>}
    {owner&&p.zoho_record_id&&<label>Linked PolyShield jobsite<select value={p.site_id||''} disabled={busy} onChange={e=>linkSite(p,e.target.value)}><option value="">Select jobsite</option>{sites.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>}
-   {technician&&p.status==='active'&&<section aria-label="Project field tools">
+   {p.status==='active'&&<button type="button" className="primary-button" onClick={()=>{setActiveWorkspace(p.id);setPhotoReminderDismissed(false)}}>Open active jobsite workspace</button>}
+   {technician&&false&&p.status==='active'&&<section aria-label="Project field tools">
     <h3>Field tools · {p.title}</h3>
     <p className="muted">Clock in for this shift, record progress, and attach photos to an asset at this jobsite. Zoho synchronization remains pending until confirmed.</p>
     <div className="section-actions" style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}}>
