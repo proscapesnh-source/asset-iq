@@ -11,6 +11,7 @@ export default function FieldProjectUpdates({ organizationId, project }) {
   const [file, setFile] = useState(null)
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
+  const [entryMode, setEntryMode] = useState('photo')
   const [feedback, setFeedback] = useState('')
   const [error, setError] = useState('')
 
@@ -28,7 +29,7 @@ export default function FieldProjectUpdates({ organizationId, project }) {
 
   async function submit(event) {
     event.preventDefault()
-    if (!assetId || !note.trim() || busy) return
+    if (!assetId || (!file && !note.trim()) || busy) return
     setBusy(true); setError(''); setFeedback('')
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -45,7 +46,7 @@ export default function FieldProjectUpdates({ organizationId, project }) {
       if (current.status !== 'active' || current.site_id !== project.site_id) throw new Error('Project is not active or its site changed.')
       const selected = assets.find(a => a.id === assetId)
       if (!selected) throw new Error('Select an asset belonging to this jobsite.')
-      if (file) await addAssetPhoto(organizationId, assetId, file, '[Field update] ' + note.trim(), false)
+      if (file) await addAssetPhoto(organizationId, assetId, file, '[Field update] ' + (note.trim() || 'Jobsite photo'), false)
       else {
         const { error: noteError } = await supabase.from('asset_service_events').insert({organization_id:organizationId,asset_id:assetId,event_type:'Field progress note',notes:'[Project '+(project.job_number || project.title)+'] '+note.trim()})
         if (noteError) throw noteError
@@ -63,12 +64,13 @@ export default function FieldProjectUpdates({ organizationId, project }) {
     {!project.site_id ? <p>Supervisor must link this project to a jobsite.</p> :
       !assets.length ? <p>No assets are registered at this site. Ask a supervisor to add one first.</p> :
       <form className="form-stack" onSubmit={submit}>
-        <label>Jobsite asset<select required value={assetId} onChange={e => setAssetId(e.target.value)}>
+        {assets.length > 1 && <label>Jobsite asset<select required value={assetId} onChange={e => setAssetId(e.target.value)}>
           {assets.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </select></label>
-        <label>Photo (optional)<input ref={fileInput} type="file" accept="image/*" capture="environment" onChange={e => setFile(e.target.files?.[0] || null)} /></label>
-        <label>Progress / work performed<textarea required maxLength={1500} value={note} onChange={e => setNote(e.target.value)} placeholder="Describe the condition or work completed" /></label>
-        <button className="primary-button" disabled={busy || !note.trim()}>{busy ? 'Saving…' : 'Save jobsite update'}</button>
+        </select></label>}
+        <div style={{display:'flex',gap:10,flexWrap:'wrap'}}><button type="button" className={entryMode==='photo'?'primary-button':'secondary-button'} onClick={()=>setEntryMode('photo')}>📷 TAKE PHOTO</button><button type="button" className={entryMode==='note'?'primary-button':'secondary-button'} onClick={()=>{setEntryMode('note');setFile(null)}}>✏️ ADD NOTE</button></div>
+        {entryMode==='photo' && <label>Photo (optional)<input ref={fileInput} type="file" accept="image/*" capture="environment" onChange={e => setFile(e.target.files?.[0] || null)} /></label>}
+        <label>What did you do? (optional with photo)<textarea maxLength={1500} value={note} onChange={e => setNote(e.target.value)} placeholder="Describe the condition or work completed" /></label>
+        <button className="primary-button" disabled={busy || (!file && !note.trim())}>{busy ? 'Saving…' : ''Save update'}</button>
       </form>}
     {error && <p role="alert" className="error-message">{error}</p>}
     {feedback && <p role="status">{feedback}</p>}
