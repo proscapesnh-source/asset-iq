@@ -1,3 +1,4 @@
+import TimeClock from './TimeClock'
 import FieldProjectUpdates from './FieldProjectUpdates'
 import ZohoAttachmentTools from './ZohoAttachmentTools'
 import { useEffect, useState } from 'react'
@@ -85,7 +86,15 @@ export default function FieldProjects({ organizationId, role, sites = [] }) {
     <button type="button" className="secondary-button" disabled={busy||!value.user} onClick={()=>assign(p)}>Assign employee</button>
    </div>}
    {owner&&p.zoho_record_id&&<label>Linked PolyShield jobsite<select value={p.site_id||''} disabled={busy} onChange={e=>linkSite(p,e.target.value)}><option value="">Select jobsite</option>{sites.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>}
-   {technician&&p.status==='active'&&<FieldProjectUpdates organizationId={organizationId} project={p} />}
+   {technician&&p.status==='active'&&<section aria-label="Project field tools">
+    <h3>Field tools · {p.title}</h3>
+    <p className="muted">Clock in for this shift, record progress, and attach photos to an asset at this jobsite. Zoho synchronization remains pending until confirmed.</p>
+    <div className="section-actions" style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}}>
+      <a href="#field-time-clock" className="secondary-button">Clock in / out</a>
+      <a href={'#project-updates-'+p.id} className="secondary-button">Add photo &amp; note</a>
+    </div>
+    <div id={'project-updates-'+p.id}><FieldProjectUpdates organizationId={organizationId} project={p} /></div>
+  </section>}
    {owner&&p.zoho_record_id&&<ZohoAttachmentTools organizationId={organizationId} project={p} />}
    <div className="section-actions" style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:12}}>
    {owner&&p.status==='owner_review'&&<button className="primary-button" disabled={busy} onClick={()=>transition(p,'work_scheduled')}>Move to Work Scheduled</button>}
@@ -96,6 +105,11 @@ export default function FieldProjects({ organizationId, role, sites = [] }) {
    </div>
    </div></article>
   })}</div></section>
+  {technician&&visibleProjects.some(p=>p.status==='active')&&<section id="field-time-clock" className="panel">
+    <h2>Time clock</h2>
+    <p className="muted">Choose the correct jobsite and work type before clocking in. The existing clock is organization-wide, not yet linked to a project ID.</p>
+    <TimeClock organizationId={organizationId} role={role} sites={sites} />
+  </section>}
   <p className="muted">Project-list access ends at closure for assigned staff. Existing asset, inspection, storage and payroll access still require separate project-level policies before this is used for sensitive customer records.</p>
  </div>
 }
