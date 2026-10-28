@@ -35,5 +35,8 @@ export function getAuthRedirectUrl() {
   const linkedAssetId = getLinkedAssetId()
   const url = new URL(base)
   if (linkedAssetId) url.searchParams.set('asset', linkedAssetId)
+  // Keep onboarding invitation across email confirmation and password recovery.
+  const invitationToken = new URLSearchParams(window.location.search).get('invite')
+  if (invitationToken && /^[0-9a-f-]{36}$/i.test(invitationToken)) url.searchParams.set('invite', invitationToken)
   return url.toString()
 }
