@@ -15,10 +15,11 @@ const managers = ['owner','admin','manager','supervisor']
 const fmt = value => value ? new Date(value).toLocaleString() : 'Active'
 const hours = row => ((new Date(row.clock_out_at || Date.now()) - new Date(row.clock_in_at))/3600000).toFixed(2)
 
-export default function TimeClock({ organizationId, role, sites=[], defaultSiteId='' }) {
+export default function TimeClock({ organizationId, role, sites=[], defaultSiteId='', compact=false }) {
  const manager = managers.includes(role)
  const [rows,setRows] = useState([])
  const [site,setSite] = useState(defaultSiteId)
+ useEffect(()=>{ if(defaultSiteId) setSite(defaultSiteId) },[defaultSiteId])
  const [type,setType] = useState('job')
  const [note,setNote] = useState('')
  const [busy,setBusy] = useState(false)
@@ -126,7 +127,7 @@ export default function TimeClock({ organizationId, role, sites=[], defaultSiteI
  }
 
  return <div className="page-stack">
-  <div className="page-heading"><div><p className="eyebrow">Workforce time tracking</p><h1>Time clock</h1><p>Times are recorded by the server. Job and travel time are tracked separately.</p></div></div>
+  {!compact && <div className="page-heading"><div><p className="eyebrow">Workforce time tracking</p><h1>Time clock</h1><p>Times are recorded by the server. Job and travel time are tracked separately.</p></div></div>}
   {error&&<p className="error-message" role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
   <section className="panel">
    <h2>{active?'You are clocked in':'Start your shift'}</h2>
@@ -141,7 +142,7 @@ export default function TimeClock({ organizationId, role, sites=[], defaultSiteI
    <p className="muted">On each clock-in/out, your device requests your location once. No continuous tracking. You can deny permission; your hours will still be saved, with no GPS coordinates. Phone location can be inaccurate or spoofed and is not proof of presence.</p>
    {gpsNotice&&<p role="status" className="muted">{gpsNotice}</p>}
   </section>
-  <section className="panel">
+  {!compact && <section className="panel">
    <div className="section-header"><div><h2>{manager?'Crew timesheets':'My timesheet'}</h2><p className="muted">Hours shown are elapsed hours; breaks and payroll approval are not automated.</p></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><label>Period <select value={days} onChange={e=>setDays(+e.target.value)}><option value={7}>7 days</option><option value={14}>14 days</option><option value={30}>30 days</option><option value={90}>90 days</option></select></label>{manager&&<><button type="button" className="secondary-button" onClick={exportCsv}>Export for Google Sheets (CSV)</button><button type="button" className="secondary-button" onClick={exportWeeklyPayroll}>Last week payroll CSV</button><button type="button" className="secondary-button" disabled={busy} onClick={syncSheets}>Send last week to Google Sheets</button></>}</div></div>
    {manager&&Array.from(totals.entries()).map(([person,total])=><p key={person}><strong>{person}</strong> · {total.toFixed(2)} completed hours</p>)}
    <div className="activity-list">{rows.map(r=><article key={r.id}><div><strong>{manager?r.technician_email:sites.find(s=>s.id===r.site_id)?.name||'Shift'} · {r.work_type}</strong><p>{fmt(r.clock_in_at)} → {fmt(r.clock_out_at)}</p><p>{r.clock_out_at?hours(r)+' hours':'Shift in progress'}{r.site_id?' · '+(sites.find(s=>s.id===r.site_id)?.name||'Site'):''}</p>{r.note&&<small>{r.note}</small>}{r.correction_reason&&<p><small><strong>Supervisor corrected:</strong> {r.correction_reason} ({fmt(r.corrected_at)})</small></p>}
@@ -154,6 +155,6 @@ export default function TimeClock({ organizationId, role, sites=[], defaultSiteI
      <label>Required correction reason <textarea rows={2} value={editForm.reason} onChange={e=>setEditForm({...editForm,reason:e.target.value})} placeholder="Forgot to clock out; confirmed actual end time with technician"/></label>
      <button className="primary-button" type="button" disabled={busy||!editForm.start||editForm.reason.trim().length<5} onClick={()=>saveCorrection(r)}>Save reviewed time correction</button>
    </div>}</div>}<p><small>Clock-in GPS: {gpsText(r.clock_in_lat,r.clock_in_lon,r.clock_in_accuracy_m)} {r.clock_in_lat!=null&&r.clock_in_lon!=null&&<a href={mapsLink(r.clock_in_lat,r.clock_in_lon)} target="_blank" rel="noopener noreferrer">View map</a>}</small></p><p><small>Clock-out GPS: {gpsText(r.clock_out_lat,r.clock_out_lon,r.clock_out_accuracy_m)} {r.clock_out_lat!=null&&r.clock_out_lon!=null&&<a href={mapsLink(r.clock_out_lat,r.clock_out_lon)} target="_blank" rel="noopener noreferrer">View map</a>}</small></p></div></article>)}{!rows.length&&<p className="muted">No recorded shifts in this period.</p>}</div>
-  </section>
+  </section>}
  </div>
 }
