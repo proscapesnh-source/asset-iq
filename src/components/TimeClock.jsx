@@ -27,13 +27,35 @@ export default function TimeClock({ organizationId, role, sites=[], defaultSiteI
  const [email,setEmail] = useState('')
  const [days,setDays] = useState(14)
  const [gpsNotice,setGpsNotice] = useState('')
+ const [corrections,setCorrections] = useState([])
+ const [editing,setEditing] = useState(null)
+ const [editForm,setEditForm] = useState({start:'',end:'',reason:'',site:'',type:'job'})
+ const [now,setNow] = useState(Date.now())
+ const [alerted,setAlerted] = useState('')
+ const [soundEnabled,setSoundEnabled] = useState(false)
+ useEffect(()=>{const id=setInterval(()=>setNow(Date.now()),30000);return()=>clearInterval(id)},[])
+ const localInput = value => {if(!value)return '';const d=new Date(value);const p=n=>String(n).padStart(2,'0');return [d.getFullYear(),'-',p(d.getMonth()+1),'-',p(d.getDate()),'T',p(d.getHours()),':',p(d.getMinutes())].join('')}
+ const openCorrection = r => {setEditing(r.id);setEditForm({start:localInput(r.clock_in_at),end:localInput(r.clock_out_at),reason:'',site:r.site_id||'',type:r.work_type})}
+ const saveCorrection = async r => {setBusy(true);setError('');setMessage('')
+  try {if(!editForm.start||editForm.reason.trim().length<5)throw new Error('Enter a start time and reason (at least 5 characters).')
+   const {error:e}=await supabase.rpc('correct_technician_time',{p_org:organizationId,p_entry:r.id,p_clock_in:new Date(editForm.start).toISOString(),p_clock_out:editForm.end?new Date(editForm.end).toISOString():null,p_reason:editForm.reason,p_site:editForm.site||null,p_work_type:editForm.type})
+   if(e)throw e;setEditing(null);await load();setMessage('Supervisor correction saved with audit history.')
+  }catch(e){setError(e.message)}finally{setBusy(false)}
+ }
+ const playTone = () => {try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;const ctx=new C();const osc=ctx.createOscillator();const gain=ctx.createGain();osc.frequency.value=880;gain.gain.value=0.18;osc.connect(gain);gain.connect(ctx.destination);osc.start();osc.stop(ctx.currentTime+0.45);osc.onended=()=>ctx.close()}catch{}}
+
  const load = async () => {
   const [{data:records,error:readError},{data:auth}] = await Promise.all([
    supabase.rpc('list_technician_timesheet_gps',{p_org:organizationId,p_days:days}),
    supabase.auth.getUser()
   ])
   if(readError) throw readError
-  setRows(records || [])
+  const {data:edits,error:correctionError}=await supabase.rpc('list_time_clock_corrections',{p_org:organizationId,p_days:days})
+  if(correctionError) throw correctionError
+  const byId=new Map((edits||[]).map(c=>[c.entry_id,c]))
+  setCorrections(edits||[])
+  setRows((records||[]).map(r=>{const c=byId.get(r.id);return c?{...r,clock_in_at:c.corrected_clock_in_at,clock_out_at:c.corrected_clock_out_at,site_id:c.corrected_site_id,work_type:c.corrected_work_type,correction_reason:c.reason,corrected_at:c.corrected_at}:r}))
+
   setEmail(auth?.user?.email || '')
  }
  useEffect(()=>{ if(!organizationId)return; let active=true
@@ -43,6 +65,16 @@ export default function TimeClock({ organizationId, role, sites=[], defaultSiteI
  },[organizationId,days])
  const own=rows.filter(r=>r.technician_email?.toLowerCase()===email.toLowerCase())
  const active=own.find(r=>!r.clock_out_at)
+ const activeElapsed=active?(now-new Date(active.clock_in_at).getTime())/3600000:0
+ const reminderLevel=activeElapsed>=14?'Supervisor review required (14+ hours)':activeElapsed>=12.5?'Second clock-out reminder (12.5 hours)':activeElapsed>=12?'12-hour shift reached — clock out or confirm you are still working':''
+ useEffect(()=>{if(!active||activeElapsed<12||!soundEnabled)return
+   const threshold=activeElapsed>=14?'14':activeElapsed>=12.5?'12.5':'12'
+   const key=active.id+':'+threshold
+   if(alerted===key)return
+   setAlerted(key);playTone()
+   if('Notification' in window && Notification.permission==='granted'&&document.visibilityState==='visible')new Notification('PolyShield: Clock-out reminder',{body:'You have been clocked in for '+threshold+' hours. Clock out if your shift has ended.'})
+ },[active?.id,activeElapsed>=12,activeElapsed>=12.5,activeElapsed>=14,soundEnabled,alerted])
+
  const change=async(action)=>{
   setBusy(true);setError('');setMessage('')
   try {
@@ -69,6 +101,8 @@ export default function TimeClock({ organizationId, role, sites=[], defaultSiteI
   {error&&<p className="error-message" role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
   <section className="panel">
    <h2>{active?'You are clocked in':'Start your shift'}</h2>
+   {active&&reminderLevel&&<p role="alert" className="error-message"><strong>{reminderLevel}</strong>. If your shift has ended, clock out now. The audible in-app tone works only while PolyShield is open.</p>}
+   {active&&<button type="button" className="secondary-button" onClick={()=>{setSoundEnabled(true);playTone();if('Notification' in window&&Notification.permission==='default')Notification.requestPermission()}}>{soundEnabled?'Sound reminders enabled while app is open':'Enable and test reminder tone'}</button>}
    {active?<p><strong>Started:</strong> {fmt(active.clock_in_at)} · {active.work_type} · {hours(active)} hours elapsed</p>:<>
     <label>Work type <select value={type} onChange={e=>setType(e.target.value)}><option value="job">On-site work</option><option value="travel">Work travel</option></select></label>
     <label>Job site <select value={site} onChange={e=>setSite(e.target.value)}><option value="">No site selected</option>{sites.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
@@ -81,7 +115,16 @@ export default function TimeClock({ organizationId, role, sites=[], defaultSiteI
   <section className="panel">
    <div className="section-header"><div><h2>{manager?'Crew timesheets':'My timesheet'}</h2><p className="muted">Hours shown are elapsed hours; breaks and payroll approval are not automated.</p></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><label>Period <select value={days} onChange={e=>setDays(+e.target.value)}><option value={7}>7 days</option><option value={14}>14 days</option><option value={30}>30 days</option><option value={90}>90 days</option></select></label>{manager&&<button type="button" className="secondary-button" onClick={exportCsv}>Export CSV</button>}</div></div>
    {manager&&Array.from(totals.entries()).map(([person,total])=><p key={person}><strong>{person}</strong> · {total.toFixed(2)} completed hours</p>)}
-   <div className="activity-list">{rows.map(r=><article key={r.id}><div><strong>{manager?r.technician_email:sites.find(s=>s.id===r.site_id)?.name||'Shift'} · {r.work_type}</strong><p>{fmt(r.clock_in_at)} → {fmt(r.clock_out_at)}</p><p>{r.clock_out_at?hours(r)+' hours':'Shift in progress'}{r.site_id?' · '+(sites.find(s=>s.id===r.site_id)?.name||'Site'):''}</p>{r.note&&<small>{r.note}</small>}<p><small>Clock-in GPS: {gpsText(r.clock_in_lat,r.clock_in_lon,r.clock_in_accuracy_m)} {r.clock_in_lat!=null&&r.clock_in_lon!=null&&<a href={mapsLink(r.clock_in_lat,r.clock_in_lon)} target="_blank" rel="noopener noreferrer">View map</a>}</small></p><p><small>Clock-out GPS: {gpsText(r.clock_out_lat,r.clock_out_lon,r.clock_out_accuracy_m)} {r.clock_out_lat!=null&&r.clock_out_lon!=null&&<a href={mapsLink(r.clock_out_lat,r.clock_out_lon)} target="_blank" rel="noopener noreferrer">View map</a>}</small></p></div></article>)}{!rows.length&&<p className="muted">No recorded shifts in this period.</p>}</div>
+   <div className="activity-list">{rows.map(r=><article key={r.id}><div><strong>{manager?r.technician_email:sites.find(s=>s.id===r.site_id)?.name||'Shift'} · {r.work_type}</strong><p>{fmt(r.clock_in_at)} → {fmt(r.clock_out_at)}</p><p>{r.clock_out_at?hours(r)+' hours':'Shift in progress'}{r.site_id?' · '+(sites.find(s=>s.id===r.site_id)?.name||'Site'):''}</p>{r.note&&<small>{r.note}</small>}{r.correction_reason&&<p><small><strong>Supervisor corrected:</strong> {r.correction_reason} ({fmt(r.corrected_at)})</small></p>}
+   {manager&&<div style={{marginTop:8}}><button type="button" className="secondary-button" onClick={()=>editing===r.id?setEditing(null):openCorrection(r)}> {editing===r.id?'Cancel correction':'Correct technician time'}</button>
+   {editing===r.id&&<div className="panel" style={{marginTop:10,display:'grid',gap:8}}>
+     <label>Actual clock-in <input type="datetime-local" value={editForm.start} onChange={e=>setEditForm({...editForm,start:e.target.value})}/></label>
+     <label>Actual clock-out <input type="datetime-local" value={editForm.end} onChange={e=>setEditForm({...editForm,end:e.target.value})}/></label>
+     <label>Work type <select value={editForm.type} onChange={e=>setEditForm({...editForm,type:e.target.value})}><option value="job">On-site work</option><option value="travel">Travel</option></select></label>
+     <label>Job site <select value={editForm.site} onChange={e=>setEditForm({...editForm,site:e.target.value})}><option value="">No site</option>{sites.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+     <label>Required correction reason <textarea rows={2} value={editForm.reason} onChange={e=>setEditForm({...editForm,reason:e.target.value})} placeholder="Forgot to clock out; confirmed actual end time with technician"/></label>
+     <button className="primary-button" type="button" disabled={busy||!editForm.start||editForm.reason.trim().length<5} onClick={()=>saveCorrection(r)}>Save reviewed time correction</button>
+   </div>}</div>}<p><small>Clock-in GPS: {gpsText(r.clock_in_lat,r.clock_in_lon,r.clock_in_accuracy_m)} {r.clock_in_lat!=null&&r.clock_in_lon!=null&&<a href={mapsLink(r.clock_in_lat,r.clock_in_lon)} target="_blank" rel="noopener noreferrer">View map</a>}</small></p><p><small>Clock-out GPS: {gpsText(r.clock_out_lat,r.clock_out_lon,r.clock_out_accuracy_m)} {r.clock_out_lat!=null&&r.clock_out_lon!=null&&<a href={mapsLink(r.clock_out_lat,r.clock_out_lon)} target="_blank" rel="noopener noreferrer">View map</a>}</small></p></div></article>)}{!rows.length&&<p className="muted">No recorded shifts in this period.</p>}</div>
   </section>
  </div>
 }
