@@ -139,7 +139,7 @@ export default function TimeClock({ organizationId, role, sites=[], defaultSiteI
    </>}
    <label>Notes (optional)<textarea maxLength={500} rows={2} value={note} onChange={e=>setNote(e.target.value)} /></label>
    <button className="primary-button" type="button" disabled={busy||!email} onClick={()=>change(active?'out':'in')}>{busy?'Saving…':active?'Clock out':'Clock in'}</button>
-   <p className="muted">On each clock-in/out, your device requests your location once. No continuous tracking. You can deny permission; your hours will still be saved, with no GPS coordinates. Phone location can be inaccurate or spoofed and is not proof of presence.</p>
+   <details><summary>How location is used</summary><p className="muted">On each clock-in/out, your device requests your location once. No continuous tracking. You can deny permission; your hours will still be saved, with no GPS coordinates. Phone location can be inaccurate or spoofed and is not proof of presence.</p></details>
    {gpsNotice&&<p role="status" className="muted">{gpsNotice}</p>}
   </section>
   {!compact && <section className="panel">
