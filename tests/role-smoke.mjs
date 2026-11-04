@@ -4,6 +4,8 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
 
+process.env.VITE_SUPABASE_URL ||= 'https://example.supabase.co'
+process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||= 'sb_publishable_mock'
 globalThis.window = { navigator: globalThis.navigator, matchMedia: () => ({matches:false}) }
 const vite = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' })
 after(async () => { await vite.close() })
