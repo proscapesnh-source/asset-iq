@@ -80,7 +80,7 @@ export default function FieldProjects({ organizationId, role, sites = [] }) {
    {!photoReminderDismissed && <p><strong>Photo reminder:</strong> Document existing conditions before work, then progress and completed areas. Add a note even if you do not have a photo.</p>}
    {!photoReminderDismissed && <button type="button" className="secondary-button" onClick={()=>setPhotoReminderDismissed(true)}>Dismiss photo reminder</button>}
   </section>
-  <section id="jobsite-clock" className="panel"><h2>Clock in / out</h2><TimeClock organizationId={organizationId} role={role} sites={sites.filter(s=>s.id===openProject.site_id)} defaultSiteId={openProject.site_id}/></section>
+  <section id="jobsite-clock"><TimeClock compact organizationId={organizationId} role={role} sites={sites.filter(s=>s.id===openProject.site_id)} defaultSiteId={openProject.site_id}/></section>
   <div id="jobsite-updates"><FieldProjectUpdates organizationId={organizationId} project={openProject}/></div>
   <p className="muted">Notes and photos save to this site's asset in PolyShield. Zoho synchronization has not been verified.</p>
  </div>
