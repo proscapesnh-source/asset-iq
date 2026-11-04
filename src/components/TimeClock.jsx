@@ -91,9 +91,9 @@ export default function TimeClock({ organizationId, role, sites=[], defaultSiteI
  const totals=new Map()
  rows.filter(r=>r.clock_out_at).forEach(r=>totals.set(r.technician_email,(totals.get(r.technician_email)||0)+(+hours(r))))
  const csvDownload=(filename,columns,records)=>{
-  const escapeCell=value=>{const raw=String(value??'');const safe=/^[\\s]*[=+@-]/.test(raw)&&!/^-[0-9.]+$/.test(raw)?"'"+raw:raw;return '"'+safe.replaceAll('"','""')+'"'}
-  const lines=[columns,...records].map(line=>line.map(escapeCell).join(',')).join('\\r\\n')
-  const blob=new Blob(['\\uFEFF'+lines],{type:'text/csv;charset=utf-8'})
+  const escapeCell=value=>{const raw=String(value??'');const safe=/^[\s]*[=+@-]/.test(raw)&&!/^-[0-9.]+$/.test(raw)?"'"+raw:raw;return '"'+safe.replaceAll('"','""')+'"'}
+  const lines=[columns,...records].map(line=>line.map(escapeCell).join(',')).join('\r\n')
+  const blob=new Blob(['\uFEFF'+lines],{type:'text/csv;charset=utf-8'})
   const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
  }
  const exportCsv=()=>csvDownload('polyshield-timesheet-sheets.csv',
