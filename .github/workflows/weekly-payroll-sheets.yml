@@ -1,0 +1,25 @@
+name: Weekly Google Sheets payroll export
+
+on:
+  schedule:
+    # Monday 14:00 UTC (8 AM CST / 9 AM CDT), prior Chicago Mon-Sun week
+    - cron: '0 14 * * 1'
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    env:
+      PAYROLL_SYNC_TOKEN: ${{ secrets.PAYROLL_SYNC_TOKEN }}
+    steps:
+      - name: Send last week's approved-access payroll snapshot to Google Sheets
+        if: env.PAYROLL_SYNC_TOKEN != ''
+        run: |
+          curl --fail-with-body --show-error --silent --retry 2 --max-time 100 \
+            -X POST \
+            -H "content-type: application/json" \
+            -H "x-payroll-sync-token: ${PAYROLL_SYNC_TOKEN}" \
+            "https://tntbijxtaatsycluiude.supabase.co/functions/v1/payroll-google-sheets"
+      - name: Integration not configured
+        if: env.PAYROLL_SYNC_TOKEN == ''
+        run: echo "PAYROLL_SYNC_TOKEN GitHub secret missing; skipping (no payroll data sent)."
