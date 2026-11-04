@@ -90,12 +90,30 @@ export default function TimeClock({ organizationId, role, sites=[], defaultSiteI
  }
  const totals=new Map()
  rows.filter(r=>r.clock_out_at).forEach(r=>totals.set(r.technician_email,(totals.get(r.technician_email)||0)+(+hours(r))))
- const exportCsv=()=>{
-  const cell=v=>'"'+String(v??'').replaceAll('"','""')+'"'
-  const lines=[['Technician','Site','Type','Clock in','Clock out','Hours','Note','In latitude','In longitude','In GPS accuracy m','Out latitude','Out longitude','Out GPS accuracy m'],...rows.map(r=>[r.technician_email,sites.find(s=>s.id===r.site_id)?.name||'',r.work_type,r.clock_in_at,r.clock_out_at||'',r.clock_out_at?hours(r):'',r.note||'',r.clock_in_lat??'',r.clock_in_lon??'',r.clock_in_accuracy_m??'',r.clock_out_lat??'',r.clock_out_lon??'',r.clock_out_accuracy_m??''])]
-  const blob=new Blob([lines.map(line=>line.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'})
-  const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='polyshield-timesheet.csv';a.click();URL.revokeObjectURL(url)
+ const csvDownload=(filename,columns,records)=>{
+  const escapeCell=value=>{const raw=String(value??'');const safe=/^[\\s]*[=+@-]/.test(raw)&&!/^-[0-9.]+$/.test(raw)?"'"+raw:raw;return '"'+safe.replaceAll('"','""')+'"'}
+  const lines=[columns,...records].map(line=>line.map(escapeCell).join(',')).join('\\r\\n')
+  const blob=new Blob(['\\uFEFF'+lines],{type:'text/csv;charset=utf-8'})
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
  }
+ const exportCsv=()=>csvDownload('polyshield-timesheet-sheets.csv',
+  ['Technician','Site','Type','Clock in','Clock out','Hours','Note','Correction reason','Corrected at','In latitude','In longitude','In GPS accuracy m','Out latitude','Out longitude','Out GPS accuracy m'],
+  rows.map(r=>[r.technician_email,sites.find(s=>s.id===r.site_id)?.name||'',r.work_type,r.clock_in_at,r.clock_out_at||'',r.clock_out_at?hours(r):'',r.note||'',r.correction_reason||'',r.corrected_at||'',r.clock_in_lat??'',r.clock_in_lon??'',r.clock_in_accuracy_m??'',r.clock_out_lat??'',r.clock_out_lon??'',r.clock_out_accuracy_m??'']))
+ const exportWeeklyPayroll=()=>{
+  const start=new Date();start.setHours(0,0,0,0);start.setDate(start.getDate()-((start.getDay()+6)%7)-7)
+  const end=new Date(start);end.setDate(end.getDate()+7)
+  const weekly=rows.filter(r=>new Date(r.clock_in_at)<end&&new Date(r.clock_out_at||Date.now())>=start)
+  const grouped=new Map()
+  for(const r of weekly){const key=[r.technician_email,r.site_id||'',r.work_type].join('|');if(!grouped.has(key))grouped.set(key,{email:r.technician_email,site:sites.find(s=>s.id===r.site_id)?.name||'',type:r.work_type,hours:0,shifts:0,open:0,adjusted:0})
+   const g=grouped.get(key);g.shifts++;
+   if(!r.clock_out_at){g.open++;continue}
+   const begin=Math.max(new Date(r.clock_in_at).getTime(),start.getTime());const finish=Math.min(new Date(r.clock_out_at).getTime(),end.getTime());g.hours+=Math.max(0,finish-begin)/3600000;if(r.correction_reason)g.adjusted++
+  }
+  csvDownload('polyshield-payroll-week-'+start.toISOString().slice(0,10)+'.csv',
+   ['Week start (local)','Week end exclusive (local)','Technician','Site','Type','Completed hours','Shifts','Open shifts (review)','Corrected shifts (review)','Status'],
+   Array.from(grouped.values()).map(g=>[start.toLocaleDateString(),end.toLocaleDateString(),g.email,g.site,g.type,g.hours.toFixed(2),g.shifts,g.open,g.adjusted,g.open?'REVIEW OPEN SHIFT':'REVIEW BEFORE PAYROLL']))
+ }
+
  return <div className="page-stack">
   <div className="page-heading"><div><p className="eyebrow">Workforce time tracking</p><h1>Time clock</h1><p>Times are recorded by the server. Job and travel time are tracked separately.</p></div></div>
   {error&&<p className="error-message" role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
@@ -113,7 +131,7 @@ export default function TimeClock({ organizationId, role, sites=[], defaultSiteI
    {gpsNotice&&<p role="status" className="muted">{gpsNotice}</p>}
   </section>
   <section className="panel">
-   <div className="section-header"><div><h2>{manager?'Crew timesheets':'My timesheet'}</h2><p className="muted">Hours shown are elapsed hours; breaks and payroll approval are not automated.</p></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><label>Period <select value={days} onChange={e=>setDays(+e.target.value)}><option value={7}>7 days</option><option value={14}>14 days</option><option value={30}>30 days</option><option value={90}>90 days</option></select></label>{manager&&<button type="button" className="secondary-button" onClick={exportCsv}>Export CSV</button>}</div></div>
+   <div className="section-header"><div><h2>{manager?'Crew timesheets':'My timesheet'}</h2><p className="muted">Hours shown are elapsed hours; breaks and payroll approval are not automated.</p></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><label>Period <select value={days} onChange={e=>setDays(+e.target.value)}><option value={7}>7 days</option><option value={14}>14 days</option><option value={30}>30 days</option><option value={90}>90 days</option></select></label>{manager&&<><button type="button" className="secondary-button" onClick={exportCsv}>Export for Google Sheets (CSV)</button><button type="button" className="secondary-button" onClick={exportWeeklyPayroll}>Last week payroll CSV</button></>}</div></div>
    {manager&&Array.from(totals.entries()).map(([person,total])=><p key={person}><strong>{person}</strong> · {total.toFixed(2)} completed hours</p>)}
    <div className="activity-list">{rows.map(r=><article key={r.id}><div><strong>{manager?r.technician_email:sites.find(s=>s.id===r.site_id)?.name||'Shift'} · {r.work_type}</strong><p>{fmt(r.clock_in_at)} → {fmt(r.clock_out_at)}</p><p>{r.clock_out_at?hours(r)+' hours':'Shift in progress'}{r.site_id?' · '+(sites.find(s=>s.id===r.site_id)?.name||'Site'):''}</p>{r.note&&<small>{r.note}</small>}{r.correction_reason&&<p><small><strong>Supervisor corrected:</strong> {r.correction_reason} ({fmt(r.corrected_at)})</small></p>}
    {manager&&<div style={{marginTop:8}}><button type="button" className="secondary-button" onClick={()=>editing===r.id?setEditing(null):openCorrection(r)}> {editing===r.id?'Cancel correction':'Correct technician time'}</button>
