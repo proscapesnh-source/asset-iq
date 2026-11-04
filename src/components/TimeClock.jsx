@@ -99,6 +99,17 @@ export default function TimeClock({ organizationId, role, sites=[], defaultSiteI
  const exportCsv=()=>csvDownload('polyshield-timesheet-sheets.csv',
   ['Technician','Site','Type','Clock in','Clock out','Hours','Note','Correction reason','Corrected at','In latitude','In longitude','In GPS accuracy m','Out latitude','Out longitude','Out GPS accuracy m'],
   rows.map(r=>[r.technician_email,sites.find(s=>s.id===r.site_id)?.name||'',r.work_type,r.clock_in_at,r.clock_out_at||'',r.clock_out_at?hours(r):'',r.note||'',r.correction_reason||'',r.corrected_at||'',r.clock_in_lat??'',r.clock_in_lon??'',r.clock_in_accuracy_m??'',r.clock_out_lat??'',r.clock_out_lon??'',r.clock_out_accuracy_m??'']))
+ const syncSheets=async()=>{
+  setBusy(true);setError('');setMessage('')
+  try {
+   const {data,error:syncError}=await supabase.functions.invoke('payroll-google-sheets',{method:'POST'})
+   if(syncError)throw syncError
+   if(!data?.ok)throw new Error(data?.error||'Google Sheets export failed.')
+   setMessage('Prior week sent to Google Sheets. Review hours before payroll approval.')
+   if(data.spreadsheetUrl)window.open(data.spreadsheetUrl,'_blank','noopener,noreferrer')
+  }catch(e){setError('Google Sheets sync unavailable: '+(e.message||'Check integration configuration.'))}
+  finally{setBusy(false)}
+ }
  const exportWeeklyPayroll=()=>{
   const start=new Date();start.setHours(0,0,0,0);start.setDate(start.getDate()-((start.getDay()+6)%7)-7)
   const end=new Date(start);end.setDate(end.getDate()+7)
@@ -131,7 +142,7 @@ export default function TimeClock({ organizationId, role, sites=[], defaultSiteI
    {gpsNotice&&<p role="status" className="muted">{gpsNotice}</p>}
   </section>
   <section className="panel">
-   <div className="section-header"><div><h2>{manager?'Crew timesheets':'My timesheet'}</h2><p className="muted">Hours shown are elapsed hours; breaks and payroll approval are not automated.</p></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><label>Period <select value={days} onChange={e=>setDays(+e.target.value)}><option value={7}>7 days</option><option value={14}>14 days</option><option value={30}>30 days</option><option value={90}>90 days</option></select></label>{manager&&<><button type="button" className="secondary-button" onClick={exportCsv}>Export for Google Sheets (CSV)</button><button type="button" className="secondary-button" onClick={exportWeeklyPayroll}>Last week payroll CSV</button></>}</div></div>
+   <div className="section-header"><div><h2>{manager?'Crew timesheets':'My timesheet'}</h2><p className="muted">Hours shown are elapsed hours; breaks and payroll approval are not automated.</p></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><label>Period <select value={days} onChange={e=>setDays(+e.target.value)}><option value={7}>7 days</option><option value={14}>14 days</option><option value={30}>30 days</option><option value={90}>90 days</option></select></label>{manager&&<><button type="button" className="secondary-button" onClick={exportCsv}>Export for Google Sheets (CSV)</button><button type="button" className="secondary-button" onClick={exportWeeklyPayroll}>Last week payroll CSV</button><button type="button" className="secondary-button" disabled={busy} onClick={syncSheets}>Send last week to Google Sheets</button></>}</div></div>
    {manager&&Array.from(totals.entries()).map(([person,total])=><p key={person}><strong>{person}</strong> · {total.toFixed(2)} completed hours</p>)}
    <div className="activity-list">{rows.map(r=><article key={r.id}><div><strong>{manager?r.technician_email:sites.find(s=>s.id===r.site_id)?.name||'Shift'} · {r.work_type}</strong><p>{fmt(r.clock_in_at)} → {fmt(r.clock_out_at)}</p><p>{r.clock_out_at?hours(r)+' hours':'Shift in progress'}{r.site_id?' · '+(sites.find(s=>s.id===r.site_id)?.name||'Site'):''}</p>{r.note&&<small>{r.note}</small>}{r.correction_reason&&<p><small><strong>Supervisor corrected:</strong> {r.correction_reason} ({fmt(r.corrected_at)})</small></p>}
    {manager&&<div style={{marginTop:8}}><button type="button" className="secondary-button" onClick={()=>editing===r.id?setEditing(null):openCorrection(r)}> {editing===r.id?'Cancel correction':'Correct technician time'}</button>
