@@ -3,7 +3,7 @@ import StatusBadge from './StatusBadge'
 import { formatDate } from '../lib/data'
 import { capabilitiesForRole, workspaceLabel } from '../lib/roles'
 
-export default function Dashboard({ data, role, onAddAsset, onOpenAsset, onInspect, onWorkOrders, onPlanning, onSupervisor, onAssetFilter, onSiteSafety }) {
+export default function Dashboard({ data, role, onAddAsset, onOpenAsset, onInspect, onWorkOrders, onPlanning, onSupervisor, onAssetFilter, onSiteSafety, onProjects, onTimeClock }) {
   const permissions = capabilitiesForRole(role)
   const allAssets = data.assets || []
   const assets = allAssets.filter((item) => !item.dna?.lifecycle_status || ['Active','Out of Service'].includes(item.dna.lifecycle_status))
@@ -11,6 +11,29 @@ export default function Dashboard({ data, role, onAddAsset, onOpenAsset, onInspe
   const average = assets.length ? Math.round(assets.reduce((sum, item) => sum + (item.health_score || 0), 0) / assets.length) : 0
   const attention = assets.filter((item) => (item.health_score || 0) < 80).length
   const openWork = workOrders.filter((item) => item.status !== 'Complete').length
+
+  if (permissions.workspace === 'technician') return <div className="page-stack">
+    <div className="page-heading"><div><p className="eyebrow">Technician workspace</p><h1>Ready for work</h1><p>Open your assigned job, record your time, and document progress.</p></div></div>
+    <section className="quick-grid">
+      <button onClick={onProjects}><span>▤</span><strong>My jobs</strong><small>Open your active jobsite and add photos or notes</small></button>
+      <button onClick={onTimeClock}><span>◷</span><strong>Clock in / out</strong><small>Record today's on-site or travel time</small></button>
+      <button onClick={onInspect}><span>✓</span><strong>Start inspection</strong><small>Capture findings and photos</small></button>
+    </section>
+    <details className="panel"><summary><strong>Other technician tools</strong></summary>
+      <div className="quick-grid" style={{marginTop:16}}>
+        <button onClick={onSiteSafety}><strong>Site safety</strong><small>Training and orientations</small></button>
+        <button onClick={onPlanning}><strong>Calculators</strong><small>Area and material planning</small></button>
+        <button onClick={onAddAsset}><strong>Register asset</strong><small>Create an equipment record</small></button>
+      </div>
+    </details>
+    <details className="panel"><summary><strong>Asset history and fleet data</strong></summary>
+      <p className="muted">Reference information is available when needed; it does not need to interrupt the workday.</p>
+      <div className="metric-grid" style={{marginTop:12}}>
+        <button className="metric-card-button" onClick={()=>onAssetFilter?.('active')}><strong>{assets.length}</strong><span>Active assets</span></button>
+        <button className="metric-card-button" onClick={()=>onAssetFilter?.('attention')}><strong>{attention}</strong><span>Need attention</span></button>
+      </div>
+    </details>
+  </div>
 
   return <div className="page-stack">
     <div className="page-heading"><div><p className="eyebrow">{workspaceLabel(role)}</p><h1>{permissions.workspace === 'technician' ? 'Field assignments' : permissions.workspace === 'maintenance' ? 'Maintenance execution' : permissions.workspace === 'supervisor' ? 'Operations overview' : 'Asset overview'}</h1><p>{permissions.workspace === 'technician' ? 'Inspect assets, capture evidence, and submit verified field findings.' : permissions.workspace === 'maintenance' ? 'Execute repairs, update components, and preserve service history.' : permissions.workspace === 'supervisor' ? 'Monitor fleet condition, approve work, and manage lifecycle decisions.' : 'View asset passports and current condition history.'}</p></div>{permissions.manageAssets && <button className="primary-button" onClick={onAddAsset}>＋ Add asset</button>}</div>
