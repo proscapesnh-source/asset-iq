@@ -74,20 +74,20 @@ export default function FieldProjects({ organizationId, role, sites = [] }) {
  if (openProject) return <div className="page-stack">
   <div className="page-heading"><div><p className="eyebrow">Active jobsite · {openProject.job_number || 'Field work'}</p><h1>{openProject.title}</h1><p>Field workspace for the duration of this project</p></div></div>
   <button type="button" className="secondary-button" onClick={()=>{setActiveWorkspace('');setPhotoReminderDismissed(false)}}>Back to all projects</button>
-  <section className="panel" role="status">
-   <h2>Start-of-shift checklist</h2>
+  <details className="panel">
+   <summary><strong>Shift reminders and instructions</strong></summary>
    <p><strong>Clock-in reminder:</strong> Check your time clock below at the start of each shift. If you are not already clocked in, choose this jobsite and clock in.</p>
    {!photoReminderDismissed && <p><strong>Photo reminder:</strong> Document existing conditions before work, then progress and completed areas. Add a note even if you do not have a photo.</p>}
    {!photoReminderDismissed && <button type="button" className="secondary-button" onClick={()=>setPhotoReminderDismissed(true)}>Dismiss photo reminder</button>}
-  </section>
-  <section id="jobsite-clock" className="panel"><h2>Clock in / out</h2><TimeClock organizationId={organizationId} role={role} sites={sites.filter(s=>s.id===openProject.site_id)} defaultSiteId={openProject.site_id}/></section>
+  </details>
+  <section id="jobsite-clock"><TimeClock compact organizationId={organizationId} role={role} sites={sites.filter(s=>s.id===openProject.site_id)} defaultSiteId={openProject.site_id}/></section>
   <div id="jobsite-updates"><FieldProjectUpdates organizationId={organizationId} project={openProject}/></div>
   <p className="muted">Notes and photos save to this site's asset in PolyShield. Zoho synchronization has not been verified.</p>
  </div>
  return <div className="page-stack">
   <div className="page-heading"><div><p className="eyebrow">Corporate project workflow</p><h1>Projects</h1><p>Owner review, supervisor assignment, scheduling, and controlled closure.</p></div></div>
-  {owner&&<section className="panel"><h2>Zoho CRM — Purchase Order Received</h2><p>Import JobSites with the exact stage <strong>Purchase Order Received</strong> into Owner Review. Existing Zoho IDs are skipped. Nothing is scheduled and no Zoho records are changed.</p><button type="button" className="primary-button" disabled={busy} onClick={syncWonJobs}>{busy?'Checking Zoho…':'Import Purchase Order Received projects'}</button>{syncResult&&<p role="status">{syncResult.matched} matching JobSites checked · {syncResult.created} imported · {syncResult.existing} already present{syncResult.failures?.length?' · '+syncResult.failures.length+' errors':''}</p>}</section>}
-  {owner&&<form className="panel form-stack" onSubmit={create}><h2>Create project</h2><label>Project / jobsite name<input value={title} required onChange={e=>setTitle(e.target.value)}/></label><label>Job number<input value={jobNumber} onChange={e=>setJobNumber(e.target.value)}/></label><label>Jobsite<select value={site} onChange={e=>setSite(e.target.value)}><option value="">Not linked yet</option>{sites.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><button className="primary-button" disabled={busy}>Create for Owner review</button><p className="muted">Projects imported from Zoho appear above under Owner Review. You can also create test projects manually.</p></form>}
+  {owner&&<details className="panel"><summary><strong>Zoho import · advanced</strong></summary><section><h2>Zoho CRM — Purchase Order Received</h2><p>Import JobSites with the exact stage <strong>Purchase Order Received</strong> into Owner Review. Existing Zoho IDs are skipped. Nothing is scheduled and no Zoho records are changed.</p><button type="button" className="primary-button" disabled={busy} onClick={syncWonJobs}>{busy?'Checking Zoho…':'Import Purchase Order Received projects'}</button>{syncResult&&<p role="status">{syncResult.matched} matching JobSites checked · {syncResult.created} imported · {syncResult.existing} already present{syncResult.failures?.length?' · '+syncResult.failures.length+' errors':''}</p>}</section></details>}
+  {owner&&<details className="panel"><summary><strong>Create project</strong></summary><form className="form-stack" onSubmit={create}><h2>Create project</h2><label>Project / jobsite name<input value={title} required onChange={e=>setTitle(e.target.value)}/></label><label>Job number<input value={jobNumber} onChange={e=>setJobNumber(e.target.value)}/></label><label>Jobsite<select value={site} onChange={e=>setSite(e.target.value)}><option value="">Not linked yet</option>{sites.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><button className="primary-button" disabled={busy}>Create for Owner review</button><p className="muted">Projects imported from Zoho appear above under Owner Review. You can also create test projects manually.</p></form></details>}
   {error&&<p role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
   <section className="panel"><h2>{owner?'All corporate projects':'My assigned projects'}</h2><div className="form-stack" style={{marginBottom:16}}><label>Search projects<input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Project, customer, job number, Zoho ID, jobsite" autoComplete="off" /></label><label>Project status<select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}><option value="all">All statuses</option><option value="owner_review">Owner Review</option><option value="work_scheduled">Work Scheduled</option><option value="active">Active</option><option value="submitted_for_close">Awaiting Close Approval</option><option value="closed">Closed</option></select></label><p className="muted" role="status">Showing {visibleProjects.length} of {projects.length} projects</p></div>{!projects.length&&<p className="muted">No accessible projects yet.</p>}
   {projects.length>0&&visibleProjects.length===0&&<p className="muted">No projects match your search or status filter.</p>}<div className="activity-list">{visibleProjects.map(p=>{
@@ -96,12 +96,12 @@ export default function FieldProjects({ organizationId, role, sites = [] }) {
    const options=staff.filter(s=>assignable(value.role,s.role))
    return <article key={p.id}><div style={{width:'100%'}}><strong>{p.title}</strong><p>{p.job_number||'No job number'} · {p.status.replaceAll('_',' ')}</p>
    <p className="muted">{assigned.map(a=>{const s=staff.find(x=>x.user_id===a.member_id);return (s?.email||'Assigned employee')+' ('+a.assignment_role.replaceAll('_',' ')+')'}).join(' · ')||'No assigned crew'}</p>
-   {owner&&p.status!=='closed'&&<div className="form-stack">
+   {owner&&p.status!=='closed'&&<details style={{marginTop:12}}><summary>Manage crew assignment</summary><div className="form-stack">
     <label>Assignment type<select value={value.role} onChange={e=>setSelection(v=>({...v,[p.id]:{role:e.target.value,user:''}}))}><option value="lead_supervisor">Lead supervisor</option><option value="supervisor">Supporting supervisor</option><option value="technician">Technician</option><option value="maintenance">Maintenance</option></select></label>
     <label>Employee<select value={value.user} onChange={e=>setSelection(v=>({...v,[p.id]:{...value,user:e.target.value}}))}><option value="">Select employee</option>{options.map(s=><option key={s.user_id} value={s.user_id}>{s.email} ({s.role})</option>)}</select></label>
     <button type="button" className="secondary-button" disabled={busy||!value.user} onClick={()=>assign(p)}>Assign employee</button>
-   </div>}
-   {owner&&p.zoho_record_id&&<label>Linked PolyShield jobsite<select value={p.site_id||''} disabled={busy} onChange={e=>linkSite(p,e.target.value)}><option value="">Select jobsite</option>{sites.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>}
+   </div></details>}
+   {owner&&p.zoho_record_id&&<details><summary>Change linked jobsite</summary><label>Linked PolyShield jobsite<select value={p.site_id||''} disabled={busy} onChange={e=>linkSite(p,e.target.value)}><option value="">Select jobsite</option>{sites.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label></details>}
    {p.status==='active'&&<button type="button" className="primary-button" onClick={()=>{setActiveWorkspace(p.id);setPhotoReminderDismissed(false)}}>Open active jobsite workspace</button>}
    {technician&&false&&p.status==='active'&&<section aria-label="Project field tools">
     <h3>Field tools · {p.title}</h3>
@@ -122,11 +122,7 @@ export default function FieldProjects({ organizationId, role, sites = [] }) {
    </div>
    </div></article>
   })}</div></section>
-  {technician&&visibleProjects.some(p=>p.status==='active')&&<section id="field-time-clock" className="panel">
-    <h2>Time clock</h2>
-    <p className="muted">Choose the correct jobsite and work type before clocking in. The existing clock is organization-wide, not yet linked to a project ID.</p>
-    <TimeClock organizationId={organizationId} role={role} sites={sites} />
-  </section>}
-  <p className="muted">Project-list access ends at closure for assigned staff. Existing asset, inspection, storage and payroll access still require separate project-level policies before this is used for sensitive customer records.</p>
+  
+  {owner && <details className="panel"><summary>Project access and policy notes</summary><p className="muted">Project-list access ends at closure for assigned staff. Existing asset, inspection, storage and payroll access still require separate project-level policies before this is used for sensitive customer records.</p></details>}
  </div>
 }

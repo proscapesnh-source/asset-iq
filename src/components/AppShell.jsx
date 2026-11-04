@@ -35,7 +35,13 @@ export default function AppShell({ organizationName, userEmail, role, active, on
   ]
   const allowed = allowedViews(role)
   const items = allItems.filter(([id]) => allowed.includes(id))
-  const primaryIds = ['dashboard', ...(allowed.includes('planning') ? ['planning'] : []), 'site-training', ...(allowed.includes('inspect') ? ['inspect'] : allowed.includes('work') ? ['work'] : [])]
+  // Keep the technician's daily job and clock actions visible without opening More.
+  const primaryIds = role === 'technician' || role === 'inspector'
+    ? ['dashboard', 'projects', 'time-clock', 'inspect']
+    : ['owner','admin','manager','supervisor'].includes(role)
+      ? ['dashboard', 'projects', 'supervisor', 'time-clock']
+      : role === 'maintenance' ? ['dashboard', 'work', 'projects', 'assets']
+      : ['dashboard', 'assets']
   const primaryItems = items.filter(([id]) => primaryIds.includes(id)).slice(0, 4)
   const moreItems = items.filter(([id]) => !primaryItems.some(([primaryId]) => primaryId === id))
   const onNav = id => { setShowMore(false); onNavigate(id) }
