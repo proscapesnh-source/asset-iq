@@ -5,7 +5,7 @@ const respond = (status: number, body: Record<string, unknown>) => new Response(
 const env = (name: string) => Deno.env.get(name) || ''
 const safe = (value: unknown) => {
   const text = String(value ?? '')
-  return /^[\\s]*[=+@-]/.test(text) && !/^-\\d+(\\.\\d+)?$/.test(text) ? "'" + text : text
+  return /^[\s]*[=+@-]/.test(text) && !/^-\d+(\.\d+)?$/.test(text) ? "'" + text : text
 }
 const dateParts = (value: Date) => {
   const parts = new Intl.DateTimeFormat('en-US', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(value)
@@ -14,7 +14,7 @@ const dateParts = (value: Date) => {
 const localMidnight = (isoDate: string) => {
   const midday = new Date(isoDate + 'T12:00:00Z')
   const zone = new Intl.DateTimeFormat('en-US', { timeZone: TZ, timeZoneName: 'shortOffset' }).formatToParts(midday).find(part => part.type === 'timeZoneName')?.value || 'GMT-6'
-  const m = zone.match(/GMT([+-])(\\d+)(?::(\\d+))?/)
+  const m = zone.match(/GMT([+-])(\d+)(?::(\d+))?/)
   const offset = m ? (m[1] === '+' ? 1 : -1) * (+m[2] * 60 + +(m[3] || 0)) : -360
   return new Date(Date.parse(isoDate + 'T00:00:00Z') - offset * 60000)
 }
@@ -28,13 +28,13 @@ const lastWeek = () => {
   const endLabel = thisMonday.toISOString().slice(0, 10)
   return { startLabel, endLabel, start: localMidnight(startLabel), end: localMidnight(endLabel) }
 }
-const b64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '')
+const b64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 const getGoogleToken = async () => {
   const json = env('GOOGLE_SERVICE_ACCOUNT_JSON')
   if (!json) throw new Error('Google Sheets credentials are not configured.')
   const creds = JSON.parse(json)
   if (!creds.client_email || !creds.private_key) throw new Error('Invalid Google service account credentials.')
-  const privateBytes = Uint8Array.from(atob(creds.private_key.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\\s/g, '')), c => c.charCodeAt(0))
+  const privateBytes = Uint8Array.from(atob(creds.private_key.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, '')), c => c.charCodeAt(0))
   const privateKey = await crypto.subtle.importKey('pkcs8', privateBytes, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign'])
   const now = Math.floor(Date.now() / 1000)
   const header = b64url(new TextEncoder().encode(JSON.stringify({ alg: 'RS256', typ: 'JWT' })))
@@ -68,7 +68,7 @@ Deno.serve(async request => {
     const org = env('PAYROLL_ORG_ID')
     const spreadsheet = env('GOOGLE_SHEET_ID')
     if (!url || !serviceKey || !org || !spreadsheet || !env('GOOGLE_SERVICE_ACCOUNT_JSON')) return respond(503, { error: 'Payroll Google Sheets integration is not configured. Set the server secrets and share the sheet with the service account.' })
-    const token = request.headers.get('authorization')?.replace(/^Bearer\\s+/i, '') || ''
+    const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') || ''
     const schedulerSecret = env('PAYROLL_SYNC_TOKEN')
     const cronAuthorized = Boolean(schedulerSecret) && request.headers.get('x-payroll-sync-token') === schedulerSecret
     if (!cronAuthorized) {
