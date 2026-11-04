@@ -35,6 +35,54 @@ export default function Dashboard({ data, role, onAddAsset, onOpenAsset, onInspe
     </details>
   </div>
 
+  if (permissions.workspace === 'viewer') return <div className="page-stack">
+    <div className="page-heading"><div><p className="eyebrow">Equipment access</p><h1>Your assets</h1><p>View equipment condition and inspection records.</p></div></div>
+    <section className="quick-grid">
+      <button onClick={()=>onAssetFilter?.('active')}><span>▣</span><strong>View assets</strong><small>Open equipment passports and history</small></button>
+      <button onClick={()=>onAssetFilter?.('attention')}><span>!</span><strong>Needs attention</strong><small>{attention} assets flagged for review</small></button>
+    </section>
+    <details className="panel"><summary><strong>Asset statistics and other tools</strong></summary>
+      <p className="muted">{assets.length} active assets · {data.inspections?.length || 0} recent inspections</p>
+      <button className="secondary-button" onClick={onSiteSafety}>Site safety resources</button>
+    </details>
+  </div>
+
+  if (permissions.workspace === 'supervisor') return <div className="page-stack">
+    <div className="page-heading"><div><p className="eyebrow">Supervisor workspace</p><h1>Today's operations</h1><p>Find active work, crew approvals and timesheets.</p></div></div>
+    <section className="quick-grid">
+      <button onClick={onProjects}><span>▤</span><strong>Projects & crews</strong><small>Active jobs and assignments</small></button>
+      <button onClick={onSupervisor}><span>◎</span><strong>Crew approvals</strong><small>Review requests and exceptions</small></button>
+      <button onClick={onTimeClock}><span>◷</span><strong>Timesheets</strong><small>Correct and export hours</small></button>
+    </section>
+    <section className="metric-grid">
+      <button className="metric-card-button" onClick={()=>onAssetFilter?.('attention')}><strong>{attention}</strong><span>Assets needing attention</span></button>
+      <button className="metric-card-button" onClick={onWorkOrders}><strong>{openWork}</strong><span>Open work orders</span></button>
+    </section>
+    <details className="panel"><summary><strong>Asset overview and planning</strong></summary>
+      <div className="quick-grid" style={{marginTop:12}}>
+        <button onClick={()=>onAssetFilter?.('active')}><strong>All assets</strong><small>{assets.length} active</small></button>
+        <button onClick={onAddAsset}><strong>Register asset</strong></button>
+        <button onClick={onPlanning}><strong>Planning</strong></button>
+        <button onClick={onSiteSafety}><strong>Site safety</strong></button>
+      </div>
+      <p className="muted">Average asset health: {assets.length ? average + '%' : 'Not available'} · Recent inspections: {data.inspections?.length || 0}</p>
+    </details>
+  </div>
+
+  if (permissions.workspace === 'maintenance') return <div className="page-stack">
+    <div className="page-heading"><div><p className="eyebrow">Maintenance workspace</p><h1>Work to do</h1><p>Keep repairs and service records up to date.</p></div></div>
+    <section className="quick-grid">
+      <button onClick={onWorkOrders}><span>◇</span><strong>Work orders</strong><small>{openWork} open</small></button>
+      <button onClick={()=>onAssetFilter?.('attention')}><span>!</span><strong>Needs attention</strong><small>Equipment requiring service</small></button>
+      <button onClick={onProjects}><span>▤</span><strong>My projects</strong><small>Assigned site work</small></button>
+    </section>
+    <details className="panel"><summary><strong>More maintenance tools</strong></summary><div className="quick-grid" style={{marginTop:12}}>
+      <button onClick={onPlanning}><strong>Repair calculators</strong></button>
+      <button onClick={onSiteSafety}><strong>Site safety</strong></button>
+      <button onClick={()=>onAssetFilter?.('active')}><strong>Asset records</strong></button>
+    </div></details>
+  </div>
+
   return <div className="page-stack">
     <div className="page-heading"><div><p className="eyebrow">{workspaceLabel(role)}</p><h1>{permissions.workspace === 'technician' ? 'Field assignments' : permissions.workspace === 'maintenance' ? 'Maintenance execution' : permissions.workspace === 'supervisor' ? 'Operations overview' : 'Asset overview'}</h1><p>{permissions.workspace === 'technician' ? 'Inspect assets, capture evidence, and submit verified field findings.' : permissions.workspace === 'maintenance' ? 'Execute repairs, update components, and preserve service history.' : permissions.workspace === 'supervisor' ? 'Monitor fleet condition, approve work, and manage lifecycle decisions.' : 'View asset passports and current condition history.'}</p></div>{permissions.manageAssets && <button className="primary-button" onClick={onAddAsset}>＋ Add asset</button>}</div>
 
