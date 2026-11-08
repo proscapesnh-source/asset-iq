@@ -1,8 +1,9 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
-const cors={ 'Access-Control-Allow-Origin':'https://asset-iq-rouge.vercel.app', 'Access-Control-Allow-Headers':'authorization,content-type,apikey', 'Access-Control-Allow-Methods':'POST,OPTIONS' }
-const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,'Content-Type':'application/json'}})
+const headersFor=(req:Request)=>{const origin=req.headers.get('Origin')||'';const safe=origin==='https://asset-iq-rouge.vercel.app'||origin==='https://asset-iq-polyshield.vercel.app'||/^https:\/\/asset-[a-z0-9]+-polyshield\.vercel\.app$/.test(origin);return { 'Access-Control-Allow-Origin':safe?origin:'https://asset-iq-rouge.vercel.app', 'Vary':'Origin', 'Access-Control-Allow-Headers':'authorization,content-type,apikey', 'Access-Control-Allow-Methods':'POST,OPTIONS' }}
 type Deal={id:string,Deal_Name:string,Stage:string,Description?:string,Closing_Date?:string}
 Deno.serve(async req=>{
+ const cors=headersFor(req)
+ const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,'Content-Type':'application/json'}})
  if(req.method==='OPTIONS')return new Response(null,{headers:cors})
  if(req.method!=='POST')return reply({error:'Method not allowed'},405)
  try{
