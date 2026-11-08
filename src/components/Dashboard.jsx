@@ -3,7 +3,7 @@ import StatusBadge from './StatusBadge'
 import { formatDate } from '../lib/data'
 import { capabilitiesForRole, workspaceLabel } from '../lib/roles'
 
-export default function Dashboard({ data, role, onAddAsset, onOpenAsset, onInspect, onWorkOrders, onPlanning, onSupervisor, onAssetFilter, onSiteSafety, onProjects, onTimeClock }) {
+export default function Dashboard({ data, role, layout, onAddAsset, onOpenAsset, onInspect, onWorkOrders, onPlanning, onSupervisor, onAssetFilter, onSiteSafety, onProjects, onTimeClock }) {
   const permissions = capabilitiesForRole(role)
   const allAssets = data.assets || []
   const assets = allAssets.filter((item) => !item.dna?.lifecycle_status || ['Active','Out of Service'].includes(item.dna.lifecycle_status))
@@ -49,15 +49,15 @@ export default function Dashboard({ data, role, onAddAsset, onOpenAsset, onInspe
 
   if (permissions.workspace === 'supervisor') return <div className="page-stack">
     <div className="page-heading"><div><p className="eyebrow">Supervisor workspace</p><h1>Today's operations</h1><p>Find active work, crew approvals and timesheets.</p></div></div>
-    <section className="quick-grid">
-      <button onClick={onProjects}><span>▤</span><strong>Projects & crews</strong><small>Active jobs and assignments</small></button>
-      <button onClick={onSupervisor}><span>◎</span><strong>Crew approvals</strong><small>Review requests and exceptions</small></button>
-      <button onClick={onTimeClock}><span>◷</span><strong>Timesheets</strong><small>Correct and export hours</small></button>
-    </section>
-    <section className="metric-grid">
-      <button className="metric-card-button" onClick={()=>onAssetFilter?.('attention')}><strong>{attention}</strong><span>Assets needing attention</span></button>
-      <button className="metric-card-button" onClick={onWorkOrders}><strong>{openWork}</strong><span>Open work orders</span></button>
-    </section>
+    {(!layout || layout.includes('projects') || layout.includes('approvals') || layout.includes('timesheets')) && <section className="quick-grid">
+      {(!layout || layout.includes('projects')) && <button onClick={onProjects}><span>▤</span><strong>Projects & crews</strong><small>Active jobs and assignments</small></button>}
+      {(!layout || layout.includes('approvals')) && <button onClick={onSupervisor}><span>◎</span><strong>Crew approvals</strong><small>Review requests and exceptions</small></button>}
+      {(!layout || layout.includes('timesheets')) && <button onClick={onTimeClock}><span>◷</span><strong>Timesheets</strong><small>Correct and export hours</small></button>}
+    </section>}
+    {(!layout || layout.includes('attention') || layout.includes('work_orders')) && <section className="metric-grid">
+      {(!layout || layout.includes('attention')) && <button className="metric-card-button" onClick={()=>onAssetFilter?.('attention')}><strong>{attention}</strong><span>Assets needing attention</span></button>}
+      {(!layout || layout.includes('work_orders')) && <button className="metric-card-button" onClick={onWorkOrders}><strong>{openWork}</strong><span>Open work orders</span></button>}
+    </section>}
     <details className="panel"><summary><strong>Asset overview and planning</strong></summary>
       <div className="quick-grid" style={{marginTop:12}}>
         <button onClick={()=>onAssetFilter?.('active')}><strong>All assets</strong><small>{assets.length} active</small></button>

@@ -3,6 +3,7 @@ import AuthScreen from './components/AuthScreen'
 import OrganizationInvitation from './components/OrganizationInvitation'
 import AppShell from './components/AppShell'
 import Dashboard from './components/Dashboard'
+import AICommand, { DEFAULT_WIDGETS, loadDashboardPreferences } from './components/AICommand'
 import AssetsRegistry from './components/AssetsRegistry'
 import AddAssetForm from './components/AddAssetForm'
 import InspectionForm from './components/InspectionForm'
@@ -47,6 +48,9 @@ export default function App() {
   const [toast, setToast] = useState('')
   const [passwordRecovery, setPasswordRecovery] = useState(false)
   const [qrPassport, setQrPassport] = useState(null)
+  const [aiOpen,setAiOpen] = useState(false)
+  const [aiLayout,setAiLayout] = useState({widgets:[...DEFAULT_WIDGETS],version:1})
+  const aiAllowed = context?.role === 'owner' || context?.role === 'supervisor'
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data, error }) => { if (error) console.error(error); setSession(data.session || null) })
@@ -92,6 +96,10 @@ export default function App() {
         const ctx = await loadContext()
         if (!alive) return
         setContext(ctx)
+        if (ctx.role === 'owner' || ctx.role === 'supervisor') {
+          try { setAiLayout(await loadDashboardPreferences(ctx.organizationId)) }
+          catch (error) { console.warn('Dashboard preferences unavailable:', error.message) }
+        }
         await refreshAll(ctx)
         await logActivity(ctx.organizationId, ctx.user.id, 'session_started', `Signed in to PolyShield Asset IQ`, null, null, { email: ctx.user.email })
         const linkedAssetId = getLinkedAssetId()
@@ -181,7 +189,9 @@ export default function App() {
     {fatalError && <div className="error-banner">{fatalError}<button onClick={() => refreshAll()}>Retry</button></div>}
     {view === 'projects' && <FieldProjects organizationId={context.organizationId} role={context.role} sites={sites} />}
     {view === 'integrations' && <IntegrationHub organizationId={context.organizationId} role={context.role} />}
-    {view === 'dashboard' && <Dashboard data={dashboard} role={context.role} onAddAsset={() => navigate('add-asset')} onOpenAsset={openAsset} onInspect={() => navigate('inspect')} onWorkOrders={() => navigate('work')} onPlanning={() => navigate('planning')} onSupervisor={() => navigate('supervisor')} onSiteSafety={() => navigate('site-training')} onProjects={() => navigate('projects')} onTimeClock={() => navigate('time-clock')} onAssetFilter={(filter)=>{setAssetFilter(filter);setSiteFilter('All');setView('assets')}} />}
+    {view === 'dashboard' && aiAllowed && <section style={{marginBottom:12}}><button type="button" className="primary-button" onClick={()=>setAiOpen(v=>!v)}>✦ AI Command · Customize dashboard</button></section>}
+    {view === 'dashboard' && aiAllowed && aiOpen && <AICommand organizationId={context.organizationId} role={context.role} current={aiLayout} onApplied={setAiLayout} onClose={()=>setAiOpen(false)} />}
+    {view === 'dashboard' && <Dashboard layout={aiAllowed ? aiLayout.widgets : undefined} data={dashboard} role={context.role} onAddAsset={() => navigate('add-asset')} onOpenAsset={openAsset} onInspect={() => navigate('inspect')} onWorkOrders={() => navigate('work')} onPlanning={() => navigate('planning')} onSupervisor={() => navigate('supervisor')} onSiteSafety={() => navigate('site-training')} onProjects={() => navigate('projects')} onTimeClock={() => navigate('time-clock')} onAssetFilter={(filter)=>{setAssetFilter(filter);setSiteFilter('All');setView('assets')}} />}
     {view === 'assets' && <AssetsRegistry assets={assets} sites={sites} initialFilter={assetFilter} initialSiteId={siteFilter} canAdd={permissions.manageAssets} canInspect={permissions.inspect} onAdd={() => navigate('add-asset')} onOpen={openAsset} onInspect={(asset) => { setSelectedAsset(asset); setView('inspect') }} />}
     {view === 'add-asset' && <AddAssetForm sites={sites} onCancel={() => navigate('assets')} onSave={async (form, file) => { const asset = await createAsset(context.organizationId, form, file); await refreshAll(); flash('Asset created.'); await openAsset(asset) }} />}
 
