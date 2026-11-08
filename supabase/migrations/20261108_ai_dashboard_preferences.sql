@@ -30,21 +30,11 @@ create policy ai_preferences_read on public.ai_dashboard_preferences for select 
 using (user_id = (select auth.uid()) and public.has_org_role(organization_id,array['owner','supervisor']));
 create policy ai_audit_read on public.ai_dashboard_audit for select to authenticated
 using (user_id = (select auth.uid()) and public.has_org_role(organization_id,array['owner','supervisor']));
--- All writes are via an invoker function so RLS applies; permit row writes only for eligible members.
-grant insert, update on public.ai_dashboard_preferences to authenticated;
-grant insert on public.ai_dashboard_audit to authenticated;
-create policy ai_preferences_insert on public.ai_dashboard_preferences for insert to authenticated
-with check (user_id = (select auth.uid()) and public.has_org_role(organization_id,array['owner','supervisor']));
-create policy ai_preferences_update on public.ai_dashboard_preferences for update to authenticated
-using (user_id = (select auth.uid()) and public.has_org_role(organization_id,array['owner','supervisor']))
-with check (user_id = (select auth.uid()) and public.has_org_role(organization_id,array['owner','supervisor']));
--- Audit writes allowed only for same role/user and actual transition.
-create policy ai_audit_insert on public.ai_dashboard_audit for insert to authenticated
-with check (user_id = (select auth.uid()) and public.has_org_role(organization_id,array['owner','supervisor']));
--- Function is SECURITY INVOKER, inserts audit in the same transaction as the settings update.
+-- Writes are exclusively through the validated RPC. Clients have SELECT only.
+-- Function explicitly verifies auth.uid() and current organization membership; never trusts a client role claim.
 create or replace function public.apply_ai_dashboard_layout(
   p_organization_id uuid, p_widgets text[], p_expected_version integer, p_command text
-) returns integer language plpgsql security invoker set search_path = public as $$
+) returns integer language plpgsql security definer set search_path = '' as $$
 declare
   v_before text[];
   v_version integer;
