@@ -3,7 +3,8 @@ import AuthScreen from './components/AuthScreen'
 import OrganizationInvitation from './components/OrganizationInvitation'
 import AppShell from './components/AppShell'
 import Dashboard from './components/Dashboard'
-import AICommand, { DEFAULT_WIDGETS, loadDashboardPreferences } from './components/AICommand'
+import { DEFAULT_WIDGETS, loadDashboardPreferences } from './components/AICommand'
+import AIConversation from './components/AIConversation'
 import AssetsRegistry from './components/AssetsRegistry'
 import AddAssetForm from './components/AddAssetForm'
 import InspectionForm from './components/InspectionForm'
@@ -189,8 +190,8 @@ export default function App() {
     {fatalError && <div className="error-banner">{fatalError}<button onClick={() => refreshAll()}>Retry</button></div>}
     {view === 'projects' && <FieldProjects organizationId={context.organizationId} role={context.role} sites={sites} />}
     {view === 'integrations' && <IntegrationHub organizationId={context.organizationId} role={context.role} />}
-    {view === 'dashboard' && aiAllowed && <section style={{marginBottom:12}}><button type="button" className="primary-button" onClick={()=>setAiOpen(v=>!v)}>✦ AI Command · Customize dashboard</button></section>}
-    {view === 'dashboard' && aiAllowed && aiOpen && <AICommand organizationId={context.organizationId} role={context.role} current={aiLayout} onApplied={setAiLayout} onClose={()=>setAiOpen(false)} />}
+    {view === 'dashboard' && aiAllowed && <section style={{marginBottom:12}}><button type="button" className="primary-button" onClick={()=>setAiOpen(v=>!v)}>✦ Ask PolyShield · Voice assistant</button></section>}
+    {view === 'dashboard' && aiAllowed && aiOpen && <AIConversation organizationId={context.organizationId} role={context.role} current={aiLayout} onApplied={setAiLayout} onClose={()=>setAiOpen(false)} onNavigate={navigate} />}
     {view === 'dashboard' && <Dashboard layout={aiAllowed ? aiLayout.widgets : undefined} data={dashboard} role={context.role} onAddAsset={() => navigate('add-asset')} onOpenAsset={openAsset} onInspect={() => navigate('inspect')} onWorkOrders={() => navigate('work')} onPlanning={() => navigate('planning')} onSupervisor={() => navigate('supervisor')} onSiteSafety={() => navigate('site-training')} onProjects={() => navigate('projects')} onTimeClock={() => navigate('time-clock')} onAssetFilter={(filter)=>{setAssetFilter(filter);setSiteFilter('All');setView('assets')}} />}
     {view === 'assets' && <AssetsRegistry assets={assets} sites={sites} initialFilter={assetFilter} initialSiteId={siteFilter} canAdd={permissions.manageAssets} canInspect={permissions.inspect} onAdd={() => navigate('add-asset')} onOpen={openAsset} onInspect={(asset) => { setSelectedAsset(asset); setView('inspect') }} />}
     {view === 'add-asset' && <AddAssetForm sites={sites} onCancel={() => navigate('assets')} onSave={async (form, file) => { const asset = await createAsset(context.organizationId, form, file); await refreshAll(); flash('Asset created.'); await openAsset(asset) }} />}
