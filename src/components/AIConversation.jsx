@@ -5,7 +5,7 @@ import { parseLayoutCommand, WIDGETS } from './AICommand'
 const ROOT='https://tntbijxtaatsycluiude.supabase.co/functions/v1/zoho-assistant-jobs'
 const EMAIL=/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i
 const ROLES=['technician','maintenance','viewer','supervisor']
-const startMessage={speaker:'assistant',text:'What can I help with? You can ask me to invite a crew member, find a job in Zoho, or change your dashboard.'}
+const startMessage={speaker:'assistant',text:'Hi, I’m Lyra, your PolyShield assistant. Tell me what you need—invite crew, bring in a Zoho job, or customize your workspace.'}
 const item=(speaker,text)=>({speaker,text})
 function normalizeRole(text) {
  const m=ROLES.find(r=>new RegExp('\\b'+r+'\\b','i').test(text))
@@ -173,11 +173,11 @@ export default function AIConversation({organizationId,role,current,onApplied,on
    else await navigator.clipboard.writeText(text)
   }catch(e){if(e.name!=='AbortError')setError('Sharing failed; copy the link manually.')}
  }
- return <section className="panel ai-command-panel" role="region" aria-label="PolyShield conversational assistant">
-  <div className="section-header"><div><p className="eyebrow">Owners and Supervisors</p><h2>✦ PolyShield Assistant</h2></div><button type="button" className="secondary-button" onClick={onClose}>Close</button></div>
+ return <section className="panel ai-command-panel" role="region" aria-label="Lyra conversational assistant">
+  <div className="section-header"><div><p className="eyebrow">Owners and Supervisors</p><h2>✦ Ask Lyra</h2></div><button type="button" className="secondary-button" onClick={onClose}>Close</button></div>
   <p className="muted">Talk or type naturally. I’ll help prepare actions and show a confirmation before changing records. No invitations are sent automatically.</p>
   <div role="log" aria-label="Assistant conversation" aria-live="polite" style={{maxHeight:330,overflowY:'auto',display:'grid',gap:10,margin:'14px 0'}}>
-   {messages.map((m,i)=><div key={i} style={{justifySelf:m.speaker==='user'?'end':'start',maxWidth:'92%',background:m.speaker==='user'?'#e7f4ed':'var(--surface-secondary,#f4f6f8)',color:'#17352b',borderRadius:12,padding:'10px 12px',whiteSpace:'pre-wrap'}}><strong style={{display:'block',fontSize:12,marginBottom:4}}>{m.speaker==='user'?'You':'PolyShield'}</strong>{m.text}</div>)}
+   {messages.map((m,i)=><div key={i} style={{justifySelf:m.speaker==='user'?'end':'start',maxWidth:'92%',background:m.speaker==='user'?'#e7f4ed':'var(--surface-secondary,#f4f6f8)',color:'#17352b',borderRadius:12,padding:'10px 12px',whiteSpace:'pre-wrap'}}><strong style={{display:'block',fontSize:12,marginBottom:4}}>{m.speaker==='user'?'You':'Lyra'}</strong>{m.text}</div>)}
    <div ref={threadEnd}/>
   </div>
   {results.length>0&&<div className="panel"><h3>Zoho job matches</h3><div className="activity-list">{results.map(d=><article key={d.id}><div><strong>{d.name}</strong><p>{d.stage||'Unknown stage'}</p></div><button className="secondary-button" type="button" onClick={()=>selectDeal(d)}>{d.importable?'Review import':'View status'}</button></article>)}</div></div>}
