@@ -3,7 +3,7 @@ import InstallApp from './InstallApp'
 import PhotoSaveViewer from './PhotoSaveViewer'
 import { allowedViews, workspaceLabel } from '../lib/roles'
 
-export default function AppShell({ organizationName, userEmail, role, active, onNavigate, onSignOut, children }) {
+export default function AppShell({ organizationName, userEmail, role, active, onNavigate, onSignOut, assistant, assistantOpen = false, onToggleAssistant, children }) {
   const [online, setOnline] = useState(navigator.onLine)
   const [showMore, setShowMore] = useState(false)
 
@@ -78,6 +78,15 @@ export default function AppShell({ organizationName, userEmail, role, active, on
           {moreItems.length > 0 && <button type="button" className={showMore || moreItems.some(([id])=>id===active) ? 'active' : ''} aria-expanded={showMore} aria-label="More navigation options" onClick={()=>setShowMore(v=>!v)}><span>☰</span><small>More</small></button>}
         </nav>
       </div>
+      {assistant && <>
+        {assistantOpen && <button type="button" className="lyra-scrim" aria-label="Close Lyra assistant" onClick={onToggleAssistant} />}
+        <aside className={'lyra-drawer' + (assistantOpen ? ' is-open' : '')} aria-label="Lyra assistant" aria-hidden={!assistantOpen}>
+          <div id="lyra-assistant-panel" className="lyra-drawer-inner">{assistant}</div>
+        </aside>
+        <button type="button" className={'lyra-fab' + (assistantOpen ? ' is-open' : '')} onClick={onToggleAssistant} aria-label={assistantOpen ? 'Close Lyra' : 'Ask Lyra'} aria-expanded={assistantOpen} aria-controls="lyra-assistant-panel">
+          <span className="lyra-fab-mark" aria-hidden="true">✦</span><span>{assistantOpen ? 'Close Lyra' : 'Ask Lyra'}</span>
+        </button>
+      </>}
       <PhotoSaveViewer />
     </div>
   )
