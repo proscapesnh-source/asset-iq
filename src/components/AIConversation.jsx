@@ -15,7 +15,7 @@ function looksLikeZoho(text){return /\bzoho\b|\bimport\b.+\b(job|project|deal)\b
 function looksLikeInvite(text){return /\b(invite|invitation|add worker|add crew|join link)\b/i.test(text)}
 function projectSearch(text){
  return text.replace(/^(please\s+)?(can you\s+)?(find|search for|look up|bring|import|pull|get|show me)\s*/i,'')
- .replace(/\b(from|in|into|over from)\s+zoho\b/ig,'')
+ .replace(/\b(over from|from|in|into)\s+zoho\b/ig,'')
  .replace(/\b(zoho|crm|jobsite|job|project|deal)\b/ig,'')
  .replace(/\b(to|into)\s+polyshield\b/ig,'').trim().replace(/^[\s,.:;-]+|[\s,.:;-]+$/g,'')
 }
@@ -90,6 +90,13 @@ export default function AIConversation({organizationId,role,current,onApplied,on
   }catch(e){say('I could not search Zoho: '+e.message)}
   finally{setBusy(false)}
  }
+ const infer=async(phrase,history)=>{
+  const {data:{session}}=await supabase.auth.getSession()
+  if(!session?.access_token)return null
+  const response=await fetch('/api/assistant-intent',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({organization_id:organizationId,message:phrase,history})})
+  if(!response.ok)return null
+  return response.json()
+ }
  const handleText=async(text)=>{
   const phrase=text.trim()
   if(!phrase||busy)return
@@ -97,6 +104,20 @@ export default function AIConversation({organizationId,role,current,onApplied,on
   setMessages(m=>[...m,item('user',phrase)])
   if(awaiting?.kind==='invite'){planInvite(phrase,awaiting);return}
   if(awaiting?.kind==='zoho'){await searchZoho(phrase);return}
+  setBusy(true)
+  let understood=null
+  try { understood=await infer(phrase,messages) } catch(e) { console.warn('AI interpreter fallback',e.message) }
+  finally { setBusy(false) }
+  if(understood?.intent==='invite'){
+   planInvite([understood.invite_role,understood.email].filter(Boolean).join(' '));return
+  }
+  if(understood?.intent==='zoho_search'){
+   await searchZoho(understood.search||projectSearch(phrase));return
+  }
+  if(understood?.intent==='dashboard'){
+   const layoutFromAI=parseLayoutCommand(understood.dashboard_command||phrase,current.widgets)
+   if(layoutFromAI){setPending({kind:'layout',widgets:layoutFromAI,version:current.version,command:phrase});say('Here is the layout I would apply. Review the sections before confirming.');return}
+  }
   if(looksLikeInvite(phrase)){planInvite(phrase);return}
   if(looksLikeZoho(phrase)){await searchZoho(projectSearch(phrase));return}
   const layout=parseLayoutCommand(phrase,current.widgets)
@@ -105,7 +126,7 @@ export default function AIConversation({organizationId,role,current,onApplied,on
    say('Here is the dashboard layout I would apply. Review the sections before confirming.')
    return
   }
-  say('I can help invite a worker, search and import an eligible Zoho job, or customize your dashboard. Try “Invite Corey as a technician” or “Find New Tech Mechanical in Zoho.”')
+  say(understood?.response || 'I can help invite a worker, search and import an eligible Zoho job, or customize your dashboard. Try “Invite Corey as a technician” or “Find New Tech Mechanical in Zoho.”')
  }
  const selectDeal=(d)=>{
   setResults([])
