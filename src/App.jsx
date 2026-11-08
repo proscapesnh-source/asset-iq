@@ -179,7 +179,7 @@ export default function App() {
   const active = view === 'asset-detail' || view === 'add-asset' || view === 'edit-asset' ? 'assets' : view
   const permissions = capabilitiesForRole(context.role)
 
-  return <AppShell organizationName={context.organizationName} userEmail={context.user.email} role={context.role} active={active} onNavigate={navigate} onSignOut={() => supabase.auth.signOut()}>
+  return <AppShell organizationName={context.organizationName} userEmail={context.user.email} role={context.role} active={active} onNavigate={navigate} onSignOut={() => supabase.auth.signOut()} assistantOpen={aiAllowed && aiOpen} onToggleAssistant={() => setAiOpen(v=>!v)} assistant={aiAllowed ? <AIConversation key={context.organizationId} organizationId={context.organizationId} role={context.role} current={aiLayout} onApplied={setAiLayout} onClose={()=>setAiOpen(false)} onNavigate={(target)=>{setAiOpen(false);navigate(target)}} /> : null}>
     {context.organizations?.length > 1 && <section className="panel" style={{marginBottom:12,padding:12}}>
       <label>Active organization <select value={context.organizationId} onChange={e=>switchOrganization(e.target.value)}>
         {context.organizations.map(org=><option key={org.id} value={org.id}>{org.name} — {org.role}</option>)}
@@ -190,8 +190,6 @@ export default function App() {
     {fatalError && <div className="error-banner">{fatalError}<button onClick={() => refreshAll()}>Retry</button></div>}
     {view === 'projects' && <FieldProjects organizationId={context.organizationId} role={context.role} sites={sites} />}
     {view === 'integrations' && <IntegrationHub organizationId={context.organizationId} role={context.role} />}
-    {view === 'dashboard' && aiAllowed && <section style={{marginBottom:12}}><button type="button" className="primary-button" onClick={()=>setAiOpen(v=>!v)}>✦ Ask PolyShield · Voice assistant</button></section>}
-    {view === 'dashboard' && aiAllowed && aiOpen && <AIConversation organizationId={context.organizationId} role={context.role} current={aiLayout} onApplied={setAiLayout} onClose={()=>setAiOpen(false)} onNavigate={navigate} />}
     {view === 'dashboard' && <Dashboard layout={aiAllowed ? aiLayout.widgets : undefined} data={dashboard} role={context.role} onAddAsset={() => navigate('add-asset')} onOpenAsset={openAsset} onInspect={() => navigate('inspect')} onWorkOrders={() => navigate('work')} onPlanning={() => navigate('planning')} onSupervisor={() => navigate('supervisor')} onSiteSafety={() => navigate('site-training')} onProjects={() => navigate('projects')} onTimeClock={() => navigate('time-clock')} onAssetFilter={(filter)=>{setAssetFilter(filter);setSiteFilter('All');setView('assets')}} />}
     {view === 'assets' && <AssetsRegistry assets={assets} sites={sites} initialFilter={assetFilter} initialSiteId={siteFilter} canAdd={permissions.manageAssets} canInspect={permissions.inspect} onAdd={() => navigate('add-asset')} onOpen={openAsset} onInspect={(asset) => { setSelectedAsset(asset); setView('inspect') }} />}
     {view === 'add-asset' && <AddAssetForm sites={sites} onCancel={() => navigate('assets')} onSave={async (form, file) => { const asset = await createAsset(context.organizationId, form, file); await refreshAll(); flash('Asset created.'); await openAsset(asset) }} />}
