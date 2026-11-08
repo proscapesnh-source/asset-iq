@@ -9,7 +9,7 @@ create table if not exists public.ai_dashboard_preferences (
   constraint ai_dashboard_widgets_valid check (
     array_length(widgets,1) between 1 and 5
     and widgets <@ array['projects','approvals','timesheets','attention','work_orders']::text[]
-    and (select count(*) from unnest(widgets) as w) = (select count(distinct w) from unnest(widgets) as w)
+    and array_position(widgets,null) is null
   )
 );
 create table if not exists public.ai_dashboard_audit (
